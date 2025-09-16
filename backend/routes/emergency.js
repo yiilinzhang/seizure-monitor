@@ -38,14 +38,12 @@ Emergency services have been notified.`;
 
   // Helper function to make voice call
   const makeVoiceCall = async (phoneNumber, userName) => {
-    const twimlUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/twiml/${encodeURIComponent(userName)}`;
-
+    // For trial accounts, we'll use TwiML directly instead of URL callback
     try {
       const call = await twilioClient.calls.create({
-        url: twimlUrl,
+        twiml: `<Response><Say voice="alice" loop="2">${userName} is experiencing a seizure now. You have been designated an emergency contact. Please check your SMS for their exact location. Emergency services have been called.</Say><Pause length="2"/><Say voice="alice">Thank you.</Say></Response>`,
         to: phoneNumber,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        method: 'GET'
+        from: process.env.TWILIO_PHONE_NUMBER
       });
       console.log(`Voice call initiated to ${phoneNumber}: ${call.sid}`);
       return { success: true, sid: call.sid };
@@ -71,7 +69,7 @@ Emergency services have been notified.`;
 
   // Main emergency trigger endpoint
   router.post('/trigger', async (req, res) => {
-    const { userId, eventId, location, delta_pct, timestamp } = req.body;
+    const { userId, eventId, location, delta_pct, timestamp, sendSMS: enableSMS = true, sendCall: enableCall = true } = req.body;
 
     // Validation
     if (!userId || !eventId || !location || !delta_pct || !timestamp) {
@@ -139,17 +137,28 @@ Emergency services have been notified.`;
               for (const contact of contacts) {
                 console.log(`Processing emergency notifications for ${contact.name} (${contact.phone_number})`);
 
-                // Send SMS
-                const smsResult = await sendSMS(contact.phone_number, user.name, eventData);
+                // Send SMS if enabled
+                let smsResult;
+                if (enableSMS) {
+                  smsResult = await sendSMS(contact.phone_number, user.name, eventData);
+                } else {
+                  smsResult = { success: false, error: 'SMS disabled by user settings' };
+                }
 
-                // Make voice call
-                const callResult = await makeVoiceCall(contact.phone_number, user.name);
+                // Make voice call if enabled
+                let callResult;
+                if (enableCall) {
+                  callResult = await makeVoiceCall(contact.phone_number, user.name);
+                } else {
+                  callResult = { success: false, error: 'Voice call disabled by user settings' };
+                }
 
                 notificationResults.push({
                   contact: contact.name,
                   phone: contact.phone_number,
                   sms: smsResult,
-                  call: callResult
+                  call: callResult,
+                  settings: { smsEnabled: enableSMS, callEnabled: enableCall }
                 });
               }
 

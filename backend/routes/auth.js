@@ -6,6 +6,24 @@ const crypto = require('crypto');
 module.exports = (db) => {
   const router = express.Router();
 
+  // Authentication middleware
+  const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) {
+        return res.status(403).json({ error: 'Invalid token' });
+      }
+      req.user = user;
+      next();
+    });
+  };
+
   // Register new user
   router.post('/register', async (req, res) => {
     const { email, password, name } = req.body;
@@ -104,6 +122,84 @@ module.exports = (db) => {
           });
         } catch (error) {
           console.error('Login error:', error);
+          res.status(500).json({ error: 'Internal server error' });
+        }
+      }
+    );
+  });
+
+  // Update user name
+  router.put('/update-name', authenticateToken, (req, res) => {
+    const { name } = req.body;
+    const userId = req.user.userId;
+
+    if (!name || name.trim() === '') {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    db.run(
+      'UPDATE users SET name = ? WHERE id = ?',
+      [name, userId],
+      function(err) {
+        if (err) {
+          console.error('Error updating name:', err);
+          return res.status(500).json({ error: 'Failed to update name' });
+        }
+
+        res.json({
+          message: 'Name updated successfully',
+          name: name
+        });
+      }
+    );
+  });
+
+  // Update user password
+  router.put('/update-password', authenticateToken, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.userId;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Both current and new passwords are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // First verify the current password
+    db.get(
+      'SELECT password FROM users WHERE id = ?',
+      [userId],
+      async (err, user) => {
+        if (err || !user) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        try {
+          const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+          if (!isValidPassword) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+          }
+
+          // Hash the new password
+          const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+          // Update the password
+          db.run(
+            'UPDATE users SET password = ? WHERE id = ?',
+            [hashedPassword, userId],
+            function(err) {
+              if (err) {
+                console.error('Error updating password:', err);
+                return res.status(500).json({ error: 'Failed to update password' });
+              }
+
+              res.json({ message: 'Password updated successfully' });
+            }
+          );
+        } catch (error) {
+          console.error('Password update error:', error);
           res.status(500).json({ error: 'Internal server error' });
         }
       }
