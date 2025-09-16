@@ -4,14 +4,22 @@ const twilio = require('twilio');
 module.exports = (db) => {
   const router = express.Router();
 
-  // Initialize Twilio client
-  const twilioClient = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-  );
+  // Initialize Twilio client (optional - works without it)
+  let twilioClient = null;
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+  }
 
   // Helper function to send SMS
   const sendSMS = async (phoneNumber, userName, eventData) => {
+    if (!twilioClient) {
+      console.log('Twilio not configured - SMS simulated');
+      return { success: false, error: 'Twilio not configured' };
+    }
+
     const { location, delta_pct, timestamp } = eventData;
     const eventTime = new Date(timestamp * 1000).toLocaleString();
     const mapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
@@ -38,6 +46,11 @@ Emergency services have been notified.`;
 
   // Helper function to make voice call
   const makeVoiceCall = async (phoneNumber, userName) => {
+    if (!twilioClient) {
+      console.log('Twilio not configured - Call simulated');
+      return { success: false, error: 'Twilio not configured' };
+    }
+
     // For trial accounts, we'll use TwiML directly instead of URL callback
     try {
       const call = await twilioClient.calls.create({
