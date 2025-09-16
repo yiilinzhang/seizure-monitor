@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConnectDevice } from './pages/ConnectDevice';
 import { LiveMonitor } from './pages/LiveMonitor';
@@ -6,7 +6,31 @@ import { History } from './pages/History';
 import { Emergency } from './pages/Emergency';
 import { Settings } from './pages/Settings';
 import { Navigation } from './components/Navigation';
+import { Login } from './components/Login';
+import { apiService } from './services/api';
+
 export function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const checkAuth = () => {
+      const authenticated = apiService.isAuthenticated();
+      setIsAuthenticated(authenticated);
+      setLoading(false);
+    };
+    checkAuth();
+  }, []);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Login onSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   return <BrowserRouter>
       <div className="bg-bg min-h-screen pb-20">
         <Routes>

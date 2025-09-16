@@ -3,71 +3,91 @@ import { Layout } from '../components/Layout';
 import { ListRow } from '../components/ListRow';
 import { Card } from '../components/Card';
 import { ClockIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-// Mock data for events
+// Mock data for seizure events
 const mockEvents = [{
   id: 1,
-  time: '10:23 AM',
+  time: '2:35 PM',
   date: 'Today',
-  delta: '+22%',
-  duration: '8s',
-  type: 'Auto-detected',
-  fullDate: new Date(2023, 9, 15) // October 15, 2023
+  delta: '+38%',
+  duration: '45s',
+  fullDate: new Date(2025, 8, 16) // Sep 16, 2025 (today)
 }, {
   id: 2,
-  time: '09:45 AM',
+  time: '10:15 AM',
   date: 'Today',
-  delta: '+18%',
-  duration: '6s',
-  type: 'Manual',
-  fullDate: new Date(2023, 9, 15) // October 15, 2023
+  delta: '+41%',
+  duration: '48s',
+  fullDate: new Date(2025, 8, 16) // Sep 16, 2025 - second event today
 }, {
   id: 3,
-  time: '08:17 AM',
-  date: 'Today',
-  delta: '+25%',
-  duration: '7s',
-  type: 'Auto-detected',
-  fullDate: new Date(2023, 9, 15) // October 15, 2023
+  time: '11:20 AM',
+  date: 'Sep 14',
+  delta: '+42%',
+  duration: '52s',
+  fullDate: new Date(2025, 8, 14) // Sep 14, 2025
 }, {
   id: 4,
-  time: '11:52 PM',
-  date: 'Yesterday',
-  delta: '+15%',
-  duration: '4s',
-  type: 'Manual',
-  fullDate: new Date(2023, 9, 14) // October 14, 2023
+  time: '3:45 PM',
+  date: 'Sep 12',
+  delta: '+35%',
+  duration: '38s',
+  fullDate: new Date(2025, 8, 12) // Sep 12, 2025
 }, {
   id: 5,
-  time: '10:08 PM',
-  date: 'Yesterday',
-  delta: '+19%',
-  duration: '5s',
-  type: 'Auto-detected',
-  fullDate: new Date(2023, 9, 14) // October 14, 2023
+  time: '9:15 AM',
+  date: 'Sep 12',
+  delta: '+48%',
+  duration: '55s',
+  fullDate: new Date(2025, 8, 12) // Sep 12, 2025 - second event
 }, {
   id: 6,
-  time: '3:45 PM',
-  date: 'Oct 10',
-  delta: '+21%',
-  duration: '7s',
-  type: 'Auto-detected',
-  fullDate: new Date(2023, 9, 10) // October 10, 2023
+  time: '6:30 PM',
+  date: 'Sep 12',
+  delta: '+39%',
+  duration: '42s',
+  fullDate: new Date(2025, 8, 12) // Sep 12, 2025 - third event
 }, {
   id: 7,
-  time: '9:12 AM',
-  date: 'Oct 8',
-  delta: '+16%',
-  duration: '5s',
-  type: 'Auto-detected',
-  fullDate: new Date(2023, 9, 8) // October 8, 2023
+  time: '9:15 AM',
+  date: 'Sep 10',
+  delta: '+51%',
+  duration: '1m 5s',
+  fullDate: new Date(2025, 8, 10) // Sep 10, 2025
 }, {
   id: 8,
-  time: '2:30 PM',
-  date: 'Oct 5',
-  delta: '+24%',
-  duration: '9s',
-  type: 'Manual',
-  fullDate: new Date(2023, 9, 5) // October 5, 2023
+  time: '7:30 PM',
+  date: 'Sep 8',
+  delta: '+39%',
+  duration: '42s',
+  fullDate: new Date(2025, 8, 8) // Sep 8, 2025
+}, {
+  id: 9,
+  time: '2:45 PM',
+  date: 'Sep 8',
+  delta: '+44%',
+  duration: '50s',
+  fullDate: new Date(2025, 8, 8) // Sep 8, 2025 - second event
+}, {
+  id: 10,
+  time: '4:22 PM',
+  date: 'Sep 5',
+  delta: '+46%',
+  duration: '55s',
+  fullDate: new Date(2025, 8, 5) // Sep 5, 2025
+}, {
+  id: 11,
+  time: '10:45 AM',
+  date: 'Sep 2',
+  delta: '+37%',
+  duration: '40s',
+  fullDate: new Date(2025, 8, 2) // Sep 2, 2025
+}, {
+  id: 12,
+  time: '6:18 PM',
+  date: 'Aug 30',
+  delta: '+48%',
+  duration: '58s',
+  fullDate: new Date(2025, 7, 30) // Aug 30, 2025
 }];
 // Calendar helper functions
 const getDaysInMonth = (year: number, month: number) => {
@@ -146,12 +166,12 @@ export const History: React.FC = () => {
     }
     setSelectedDate(null);
   };
-  // Check if a day has events
-  const hasEvents = (day: number, month: number, year: number) => {
-    return mockEvents.some(event => {
+  // Count events for a specific day
+  const getEventCount = (day: number, month: number, year: number) => {
+    return mockEvents.filter(event => {
       const eventDate = event.fullDate;
       return eventDate.getDate() === day && eventDate.getMonth() === month && eventDate.getFullYear() === year;
-    });
+    }).length;
   };
   // Filter events by selected date
   const filteredEvents = useMemo(() => {
@@ -188,10 +208,6 @@ export const History: React.FC = () => {
               <div>
                 <div className="text-bodySmall text-ink-60">Duration</div>
                 <div className="text-title font-semibold">{event.duration}</div>
-              </div>
-              <div>
-                <div className="text-bodySmall text-ink-60">Type</div>
-                <div className="text-body">{event.type}</div>
               </div>
             </div>
             <div className="h-32 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
@@ -242,15 +258,45 @@ export const History: React.FC = () => {
           </div>
           {/* Calendar grid */}
           <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, index) => <button key={index} className={`
-                  h-10 flex flex-col items-center justify-center rounded-full relative
-                  ${day.isCurrentMonth ? 'text-ink-100' : 'text-ink-60/50'}
-                  ${isToday(day.day, day.month, day.year) ? 'font-semibold' : ''}
-                  ${isSelectedDay(day.day, day.month, day.year) ? 'bg-brand-primary text-white' : ''}
-                `} onClick={() => selectDay(day.day, day.month, day.year)}>
-                <span>{day.day}</span>
-                {hasEvents(day.day, day.month, day.year) && !isSelectedDay(day.day, day.month, day.year) && <div className={`absolute bottom-1 w-1.5 h-1.5 rounded-full ${isSelectedDay(day.day, day.month, day.year) ? 'bg-white' : 'bg-brand-primary'}`}></div>}
-              </button>)}
+            {calendarDays.map((day, index) => {
+              const eventCount = getEventCount(day.day, day.month, day.year);
+              const isSelected = isSelectedDay(day.day, day.month, day.year);
+
+              return (
+                <button
+                  key={index}
+                  className={`
+                    w-10 h-10 flex flex-col items-center justify-center rounded-full relative
+                    ${day.isCurrentMonth ? 'text-ink-100' : 'text-ink-60/50'}
+                    ${isToday(day.day, day.month, day.year) ? 'font-semibold' : ''}
+                    ${isSelected ? 'ring-1 ring-brand-primary' : ''}
+                  `}
+                  onClick={() => selectDay(day.day, day.month, day.year)}
+                >
+                  <span>{day.day}</span>
+                  {eventCount > 0 && (
+                    <div className="absolute bottom-0.5 flex space-x-0.5">
+                      {eventCount === 1 && (
+                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      )}
+                      {eventCount === 2 && (
+                        <>
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                        </>
+                      )}
+                      {eventCount >= 3 && (
+                        <>
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </Card>
         {/* Events for selected day */}
@@ -265,7 +311,7 @@ export const History: React.FC = () => {
             })}
               </h2>
               {filteredEvents.length > 0 ? <div className="space-y-2">
-                  {filteredEvents.map(event => <ListRow key={event.id} icon={<ClockIcon size={20} className="text-ink-60" />} title={`${event.time} - ${event.delta}`} meta={`${event.duration} • ${event.type}`} onClick={() => handleEventClick(event.id)} />)}
+                  {filteredEvents.map(event => <ListRow key={event.id} icon={<ClockIcon size={20} className="text-ink-60" />} title={`${event.time} - ${event.delta}`} meta={`Duration: ${event.duration}`} onClick={() => handleEventClick(event.id)} />)}
                 </div> : <div className="text-center py-6 text-ink-60">
                   No events on this day
                 </div>}
