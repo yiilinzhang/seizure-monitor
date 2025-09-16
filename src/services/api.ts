@@ -1,6 +1,6 @@
 // Use mock API for standalone demo when backend is not available
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const USE_MOCK = false; // Set to true to use mock API without backend
+const USE_MOCK = true; // Using mock until Render backend is fixed
 
 interface AuthResponse {
   token: string;
