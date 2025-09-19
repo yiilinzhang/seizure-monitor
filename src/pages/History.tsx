@@ -1,9 +1,68 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { ListRow } from '../components/ListRow';
 import { Card } from '../components/Card';
-import { ClockIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-// Mock data for seizure events
+import { ClockIcon, ChevronLeftIcon, ChevronRightIcon, ActivityIcon, HeartIcon, WindIcon, BrainIcon } from 'lucide-react';
+
+// Calculate severity based on sensor data and algorithm thresholds
+const calculateSeverity = (sensorData: any) => {
+  const menthone = sensorData?.menthone || 0;
+  const hr = sensorData?.heartRate || 75;
+  const spo2 = sensorData?.spo2 || 97;
+  const emg = sensorData?.emg || 0.5;
+
+  // Severity scoring based on algorithm thresholds
+  let severityScore = 0;
+
+  // Menthone contribution (primary indicator)
+  if (menthone > 40) severityScore += 3;
+  else if (menthone > 25) severityScore += 2;
+  else if (menthone > 15) severityScore += 1;
+
+  // Heart rate contribution
+  if (hr > 120) severityScore += 2;
+  else if (hr > 100) severityScore += 1;
+
+  // SpO2 contribution (lower is worse)
+  if (spo2 < 90) severityScore += 2;
+  else if (spo2 < 94) severityScore += 1;
+
+  // EMG contribution
+  if (emg > 0.8) severityScore += 2;
+  else if (emg > 0.7) severityScore += 1;
+
+  // Map score to severity levels
+  if (severityScore >= 7) return 'Severe';
+  if (severityScore >= 4) return 'Moderate';
+  return 'Mild';
+};
+
+// Load seizure logs from localStorage
+const loadSeizureLogs = () => {
+  const logs = localStorage.getItem('seizureLogs');
+  if (logs) {
+    const parsedLogs = JSON.parse(logs);
+    // Transform to match the expected format
+    return parsedLogs.map((log: any) => {
+      const calculatedSeverity = calculateSeverity(log.sensorData);
+      return {
+        id: log.id,
+        time: log.time || new Date(log.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+        date: new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        delta: `+${Math.round(log.sensorData?.menthone || 0)}%`,
+        fullDate: new Date(log.date),
+        severity: calculatedSeverity,  // Algorithm-calculated severity
+        confidence: log.confidence,
+        notes: log.notes,
+        sensorData: log.sensorData,
+        userNote: log.userNote
+      };
+    });
+  }
+  return mockEvents; // Fall back to mock data if no real data
+};
+
+// Mock data for seizure events (as fallback)
 const mockEvents = [{
   id: 1,
   time: '2:35 PM',
@@ -101,6 +160,15 @@ export const History: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [events, setEvents] = useState<any[]>([]);
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [noteText, setNoteText] = useState('');
+
+  // Load events from localStorage on mount
+  useEffect(() => {
+    const loadedEvents = loadSeizureLogs();
+    setEvents(loadedEvents);
+  }, []);
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   // Generate calendar days
@@ -168,7 +236,7 @@ export const History: React.FC = () => {
   };
   // Count events for a specific day
   const getEventCount = (day: number, month: number, year: number) => {
-    return mockEvents.filter(event => {
+    return events.filter(event => {
       const eventDate = event.fullDate;
       return eventDate.getDate() === day && eventDate.getMonth() === month && eventDate.getFullYear() === year;
     }).length;
@@ -176,11 +244,11 @@ export const History: React.FC = () => {
   // Filter events by selected date
   const filteredEvents = useMemo(() => {
     if (!selectedDate) return [];
-    return mockEvents.filter(event => {
+    return events.filter(event => {
       const eventDate = event.fullDate;
       return eventDate.getDate() === selectedDate.getDate() && eventDate.getMonth() === selectedDate.getMonth() && eventDate.getFullYear() === selectedDate.getFullYear();
     });
-  }, [selectedDate]);
+  }, [selectedDate, events]);
   // Handle day selection
   const selectDay = (day: number, month: number, year: number) => {
     setSelectedDate(new Date(year, month, day));
@@ -188,41 +256,220 @@ export const History: React.FC = () => {
   const handleEventClick = (id: number) => {
     setSelectedEvent(id);
   };
+
   const renderEventDetails = () => {
-    const event = mockEvents.find(e => e.id === selectedEvent);
+    const event = events.find(e => e.id === selectedEvent);
     if (!event) return null;
+
+
+    // Save note to event
+    const handleSaveNote = () => {
+      if (!noteText.trim()) return;
+
+      // Update event with note
+      const updatedEvent = { ...event, userNote: noteText };
+
+      // Update events array
+      const updatedEvents = events.map(e => e.id === event.id ? updatedEvent : e);
+      setEvents(updatedEvents);
+
+      // Save to localStorage
+      const logs = localStorage.getItem('seizureLogs');
+      if (logs) {
+        const parsedLogs = JSON.parse(logs);
+        const updatedLogs = parsedLogs.map((log: any) =>
+          log.id === event.id ? { ...log, userNote: noteText } : log
+        );
+        localStorage.setItem('seizureLogs', JSON.stringify(updatedLogs));
+      }
+
+      // Reset note input
+      setShowNoteInput(false);
+      setNoteText('');
+    };
+
+    // Generate observations based on sensor data
+    const getObservations = () => {
+      const menthone = event.sensorData?.menthone || 0;
+      const hr = event.sensorData?.heartRate || 0;
+      const spo2 = event.sensorData?.spo2 || 0;
+      const emg = event.sensorData?.emg || 0;
+
+      let observations = [];
+
+      if (menthone > 40) {
+        observations.push("Significant menthone spike detected");
+      } else if (menthone > 20) {
+        observations.push("Moderate menthone elevation");
+      }
+
+      if (hr > 100) {
+        observations.push("Elevated heart rate during event");
+      }
+
+      if (spo2 < 94) {
+        observations.push("Blood oxygen dropped below normal");
+      }
+
+      if (emg > 0.7) {
+        observations.push("High muscle activity recorded");
+      }
+
+      if (event.severity === 'High') {
+        observations.push("Event classified as high severity");
+      }
+
+      return observations.length > 0 ? observations.join(". ") + "." : "Normal physiological response recorded.";
+    };
+
     return <div className="fixed inset-0 bg-bg z-50 overflow-auto">
-        <Layout title="Event Details" showBack={true}>
-          <Card className="mt-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-h2 font-semibold">{event.time}</div>
-              <div className="text-bodySmall text-ink-60">{event.date}</div>
+        <div className="flex flex-col h-full">
+          {/* Custom Header with Back Button */}
+          <div className="bg-white border-b border-ink-60/10 px-4 py-4">
+            <div className="flex items-center">
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="mr-3 p-1"
+              >
+                <ChevronLeftIcon size={24} className="text-ink-100" />
+              </button>
+              <h1 className="text-h1 font-semibold">Event Details</h1>
             </div>
-            <div className="flex justify-between mb-6">
-              <div>
-                <div className="text-bodySmall text-ink-60">Peak delta</div>
-                <div className="text-title font-semibold text-semantic-alert">
-                  {event.delta}
+          </div>
+
+          <div className="flex-1 overflow-auto p-4">
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-h2 font-semibold">{event.time}</div>
+                <div className="text-bodySmall text-ink-60">{event.date}</div>
+              </div>
+
+              {/* 4 Sensor Signals Grid */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-gray-50 rounded-lg p-2 flex items-center">
+                  <ActivityIcon size={14} className="text-blue-600 mr-1.5" />
+                  <div>
+                    <div className="text-xs text-ink-60">Menthone</div>
+                    <div className="text-bodySmall font-semibold text-blue-600">
+                      {event.delta || '+0%'}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2 flex items-center">
+                  <HeartIcon size={14} className="text-red-500 mr-1.5" />
+                  <div>
+                    <div className="text-xs text-ink-60">Heart Rate</div>
+                    <div className="text-bodySmall font-semibold text-red-500">
+                      {Math.round(event.sensorData?.heartRate || 75)} bpm
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2 flex items-center">
+                  <WindIcon size={14} className="text-green-600 mr-1.5" />
+                  <div>
+                    <div className="text-xs text-ink-60">Blood O₂</div>
+                    <div className="text-bodySmall font-semibold text-green-600">
+                      {Math.round(event.sensorData?.spo2 || 97)}%
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2 flex items-center">
+                  <BrainIcon size={14} className="text-purple-600 mr-1.5" />
+                  <div>
+                    <div className="text-xs text-ink-60">Muscle</div>
+                    <div className="text-bodySmall font-semibold text-purple-600">
+                      {Math.round((event.sensorData?.emg || 0.5) * 100)}%
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="text-bodySmall text-ink-60">Duration</div>
-                <div className="text-title font-semibold">{event.duration}</div>
-              </div>
+
+            {/* Observations */}
+            <div className="bg-blue-50 rounded-lg p-3 mb-3">
+              <div className="text-xs font-semibold text-ink-100 mb-1">Observations</div>
+              <p className="text-xs text-ink-80 leading-relaxed">
+                {getObservations()}
+              </p>
             </div>
-            <div className="h-32 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
-              <span className="text-ink-60">Event sparkline chart</span>
+
+            {/* Confidence Score */}
+            <div className="flex items-center justify-between mb-3 px-2">
+              <span className="text-xs text-ink-60">Detection Confidence</span>
+              <span className="text-xs font-semibold">
+                {Math.round((event.confidence || 0) * 100)}%
+              </span>
             </div>
-            <div className="space-y-4">
-              <button className="w-full py-2 border border-ink-60/20 rounded-lg text-bodySmall font-semibold">
-                Add note
-              </button>
-              <button className="w-full py-2 border border-ink-60/20 rounded-lg text-bodySmall font-semibold">
-                Export CSV
-              </button>
+
+            {/* Algorithm-Calculated Severity (Read-Only) */}
+            <div className="flex items-center justify-between mb-3 px-2">
+              <span className="text-xs text-ink-60">Algorithm Severity</span>
+              <span
+                className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                  event.severity === 'Mild'
+                    ? 'bg-green-100 text-green-700'
+                    : event.severity === 'Severe'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                }`}
+              >
+                {event.severity || 'Moderate'}
+              </span>
             </div>
-          </Card>
-        </Layout>
+
+              {/* User Notes Section */}
+              {event.userNote && !showNoteInput && (
+                <div className="bg-yellow-50 rounded-lg p-3 mb-3">
+                  <div className="text-xs font-semibold text-ink-100 mb-1">Your Notes</div>
+                  <p className="text-xs text-ink-80 leading-relaxed">
+                    {event.userNote}
+                  </p>
+                </div>
+              )}
+
+              {/* Note Input */}
+              {showNoteInput ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Add your thoughts about this seizure event..."
+                    className="w-full p-3 border border-ink-60/20 rounded-lg text-bodySmall resize-none"
+                    rows={4}
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setShowNoteInput(false);
+                        setNoteText('');
+                      }}
+                      className="flex-1 py-2 border border-ink-60/20 rounded-lg text-bodySmall font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveNote}
+                      className="flex-1 py-2 bg-brand-primary text-white rounded-lg text-bodySmall font-semibold"
+                      disabled={!noteText.trim()}
+                    >
+                      Save Note
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowNoteInput(true);
+                    setNoteText(event.userNote || '');
+                  }}
+                  className="w-full py-2 border border-ink-60/20 rounded-lg text-bodySmall font-semibold"
+                >
+                  {event.userNote ? 'Edit Note' : 'Add Note'}
+                </button>
+              )}
+            </Card>
+          </div>
+        </div>
       </div>;
   };
   const isToday = (day: number, month: number, year: number) => {
@@ -311,7 +558,31 @@ export const History: React.FC = () => {
             })}
               </h2>
               {filteredEvents.length > 0 ? <div className="space-y-2">
-                  {filteredEvents.map(event => <ListRow key={event.id} icon={<ClockIcon size={20} className="text-ink-60" />} title={`${event.time} - ${event.delta}`} meta={`Duration: ${event.duration}`} onClick={() => handleEventClick(event.id)} />)}
+                  {filteredEvents.map(event => (
+                    <div key={event.id} className="relative">
+                      <ListRow
+                        icon={<ClockIcon size={20} className="text-ink-60" />}
+                        title={`${event.time}`}
+                        meta={
+                          <div className="flex items-center gap-2">
+                            <span>Menthone: {event.delta}</span>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                event.severity === 'Mild'
+                                  ? 'bg-green-100 text-green-700'
+                                  : event.severity === 'Severe'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              }`}
+                            >
+                              {event.severity || 'Moderate'}
+                            </span>
+                          </div>
+                        }
+                        onClick={() => handleEventClick(event.id)}
+                      />
+                    </div>
+                  ))}
                 </div> : <div className="text-center py-6 text-ink-60">
                   No events on this day
                 </div>}
