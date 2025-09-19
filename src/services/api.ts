@@ -2,6 +2,9 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const USE_MOCK = true; // Using mock until Render backend is fixed
 
+// Import mock service when in mock mode
+import { apiService as mockApiService } from './api-mock';
+
 interface AuthResponse {
   token: string;
   user: {
@@ -216,4 +219,5 @@ class ApiService {
   }
 }
 
-export const apiService = new ApiService();
+// Export the appropriate service based on USE_MOCK flag
+export const apiService = USE_MOCK ? mockApiService : new ApiService();

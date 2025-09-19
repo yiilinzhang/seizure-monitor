@@ -229,7 +229,7 @@ export const Emergency: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-h3 font-semibold">{contact.name}</h3>
-                  <p className="text-bodySmall text-ink-60">{contact.countryCode} {contact.phone}</p>
+                  <p className="text-bodySmall text-ink-60">{contact.countryCode} {contact.phone.replace(/\s/g, '')}</p>
                 </div>
                 <div className="flex">
                   <button onClick={() => handleEditClick(contact)} className="p-2 text-ink-60">
