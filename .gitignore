@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+ml/Seizure Dataset/**/*.json
+ml/Seizure Dataset/**/*.csv
+
+# Exclude large dataset files
+ml/Seizure Dataset/
