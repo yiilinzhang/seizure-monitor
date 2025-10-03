@@ -1,192 +1,234 @@
-# Sensor Monitoring App
+# Seizure Detection System
 
-A real-time sensor monitoring application built with React, TypeScript, and Vite. This app provides features for device connectivity, live monitoring, data history, emergency alerts, and customizable settings.
+An AI-powered emergency response system for real-time seizure detection using ESP32 sensors, React Native mobile app, and FastAPI backend.
 
-## Features
+## 🚀 Quick Start
 
-- **Device Connection**: Connect and manage sensor devices
-- **Live Monitoring**: Real-time data visualization with charts
-- **Historical Data**: View and analyze past sensor readings
-- **Emergency Alerts**: Configure and manage emergency notifications
-- **Settings**: Customize app preferences and configurations
+### Prerequisites
+- Python 3.9+
+- Node.js 18+
+- PostgreSQL 14+ (or use SQLite for development)
+- React Native development environment ([Setup Guide](https://reactnative.dev/docs/environment-setup))
 
-## Prerequisites
+### Backend Setup (FastAPI)
 
-- Node.js (v16 or higher)
-- npm or yarn package manager
-- For mobile testing: iOS/Android device or emulator
-
-## Installation
-
-1. Clone or download this repository:
 ```bash
-git clone <repository-url>
-cd "Sensor code Pixel"
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Run the server
+uvicorn app.main:app --reload
+
+# API will be available at http://localhost:8000
+# Interactive docs at http://localhost:8000/docs
 ```
 
-2. Install dependencies:
+### Mobile App Setup (React Native)
+
 ```bash
+cd mobile
 npm install
+
+# iOS (Mac only)
+cd ios && pod install && cd ..
+npm run ios
+
+# Android
+npm run android
+
+# Start Metro bundler (if not auto-started)
+npx react-native start
 ```
 
-## Running the Application
+## 📁 Project Structure
 
-### Web Development Server
+```
+seizure-detection-system/
+├── mobile/              # React Native mobile app
+├── backend/             # FastAPI backend server
+├── ml/                  # Machine learning models
+├── hardware/            # ESP32 firmware
+└── docs/                # Documentation
+```
 
-Start the development server:
+## 🏗 Architecture
+
+### System Components
+
+1. **ESP32 Sensor Module** - Collects accelerometer, gyroscope, and biometric data
+2. **React Native App** - Offline-first mobile app with local ML inference
+3. **FastAPI Backend** - REST API with WebSocket support for real-time updates
+4. **PostgreSQL Database** - Stores user data and sensor readings
+5. **PyTorch Models** - Seizure detection ML models
+
+### Data Flow
+
+```
+ESP32 → Bluetooth → Mobile App → Local SQLite
+                         ↓
+                   PyTorch Mobile (Inference)
+                         ↓
+                   Emergency Alert (if detected)
+                         ↓
+                   Sync to Cloud (when online)
+```
+
+## 💻 Development
+
+### Backend Development
+
 ```bash
-npm run dev
+cd backend
+
+# Create .env file
+cat > .env << EOL
+DATABASE_URL=postgresql://user:pass@localhost/seizure_db
+SECRET_KEY=your-secret-key-here
+TWILIO_ACCOUNT_SID=your-twilio-sid
+TWILIO_AUTH_TOKEN=your-twilio-token
+TWILIO_PHONE_NUMBER=+1234567890
+EOL
+
+# Run with auto-reload
+uvicorn app.main:app --reload --port 8000
 ```
 
-The app will be available at `http://localhost:5173` (or the port shown in your terminal).
+### Mobile Development
 
-### Building for Production
-
-Create an optimized production build:
 ```bash
-npm run build
+cd mobile
+
+# Run on iOS simulator
+npm run ios
+
+# Run on Android emulator
+npm run android
+
+# Run tests
+npm test
+
+# Build for production
+# iOS
+cd ios && xcodebuild -workspace SeizureDetector.xcworkspace -scheme SeizureDetector -configuration Release
+
+# Android
+cd android && ./gradlew assembleRelease
 ```
 
-Preview the production build:
+## 📚 API Documentation
+
+Once the backend is running, visit:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### Key Endpoints
+
+- `POST /api/v1/auth/login` - User authentication
+- `POST /api/v1/auth/register` - User registration
+- `GET /api/v1/contacts` - Get emergency contacts
+- `POST /api/v1/contacts` - Add emergency contact
+- `POST /api/v1/trigger` - Trigger emergency alert
+- `WS /ws` - WebSocket for real-time updates
+
+## 🧪 Testing
+
 ```bash
-npm run preview
+# Backend tests
+cd backend
+pytest
+
+# Mobile tests
+cd mobile
+npm test
+
+# End-to-end tests
+npm run test:e2e
 ```
 
-## Mobile Testing Options
+## 🔧 Configuration
 
-### Option 1: Browser Mobile Emulation
+### Environment Variables
 
-1. Open the app in Chrome/Edge/Firefox
-2. Press F12 to open Developer Tools
-3. Click the device toggle button (usually looks like a phone/tablet icon)
-4. Select a device preset (e.g., iPhone, Pixel, Galaxy)
-5. The app will render in mobile view
+Backend (`backend/.env`):
+```env
+DATABASE_URL=postgresql://user:pass@localhost/db
+SECRET_KEY=your-secret-key
+JWT_ALGORITHM=HS256
+TWILIO_ACCOUNT_SID=xxx
+TWILIO_AUTH_TOKEN=xxx
+TWILIO_PHONE_NUMBER=+1234567890
+```
 
-### Option 2: Access from Mobile Device (Same Network)
+Mobile (`mobile/.env`):
+```env
+API_URL=http://localhost:8000
+ENABLE_MOCK_DATA=false
+```
 
-1. Find your computer's IP address:
-   - **Windows**: `ipconfig` (look for IPv4 Address)
-   - **Mac/Linux**: `ifconfig` or `ip addr`
+## 📱 Features
 
-2. Start the dev server with host option:
+### Mobile App
+- ✅ Bluetooth connection to ESP32
+- ✅ Real-time sensor monitoring
+- ✅ Offline seizure detection
+- ✅ Emergency contact management
+- ✅ Automatic SMS/call alerts
+- ✅ Historical data analysis
+- ✅ Background monitoring
+
+### Backend
+- ✅ JWT authentication
+- ✅ RESTful API
+- ✅ WebSocket support
+- ✅ Twilio integration
+- ✅ Async database operations
+- ✅ Auto-generated documentation
+
+## 🚢 Deployment
+
+### Backend Deployment
+
 ```bash
-npm run dev -- --host
+# Using Docker
+docker build -t seizure-backend .
+docker run -p 8000:8000 --env-file .env seizure-backend
+
+# Using Docker Compose
+docker-compose up -d
 ```
 
-3. On your mobile device, open browser and navigate to:
-```
-http://YOUR_COMPUTER_IP:5173
-```
+### Mobile Deployment
 
-### Option 3: Mobile App Wrapper (Capacitor)
-
-Transform this web app into a native mobile app:
-
-1. Install Capacitor:
 ```bash
-npm install @capacitor/core @capacitor/cli
-npx cap init "Sensor App" com.example.sensorapp
+# iOS - App Store
+cd ios
+fastlane release
+
+# Android - Play Store
+cd android
+fastlane release
 ```
 
-2. Add mobile platforms:
-```bash
-# For iOS
-npx cap add ios
-npm install @capacitor/ios
+## 🤝 Contributing
 
-# For Android
-npx cap add android
-npm install @capacitor/android
-```
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-3. Build and sync:
-```bash
-npm run build
-npx cap sync
-```
+## 📄 License
 
-4. Open in native IDE:
-```bash
-# iOS (requires Xcode on Mac)
-npx cap open ios
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-# Android (requires Android Studio)
-npx cap open android
-```
+## 🆘 Support
 
-### Option 4: Progressive Web App (PWA)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/seizure-detection/issues)
+- **Email**: support@seizuredetection.com
+- **Documentation**: [docs/](docs/)
 
-Add PWA capabilities for installable mobile experience:
+## ⚠️ Disclaimer
 
-1. Install PWA plugin:
-```bash
-npm install vite-plugin-pwa -D
-```
-
-2. Update `vite.config.ts` to include PWA configuration
-3. Build and deploy to HTTPS server
-4. Users can install directly from browser
-
-## Testing Mock Data
-
-For development without real sensors, the app includes mock data functionality:
-
-1. Mock sensor connections in `/connect` page
-2. Simulated real-time data in `/live-monitor`
-3. Sample historical data in `/history`
-4. Test emergency alerts in `/emergency`
-
-## Project Structure
-
-```
-Sensor code Pixel/
-├── src/
-│   ├── components/     # Reusable UI components
-│   ├── pages/          # Application pages/routes
-│   ├── App.tsx         # Main application component
-│   └── index.tsx       # Application entry point
-├── public/             # Static assets
-├── index.html          # HTML template
-├── package.json        # Dependencies and scripts
-├── vite.config.ts      # Vite configuration
-└── tailwind.config.js  # Tailwind CSS configuration
-```
-
-## Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-
-## Customization
-
-### Styling
-- Tailwind CSS classes in components
-- Global styles in `src/index.css`
-
-### Routes
-- Modify routes in `src/App.tsx`
-- Add new pages in `src/pages/`
-
-### Components
-- Reusable components in `src/components/`
-- Each component is self-contained with TypeScript props
-
-## Troubleshooting
-
-### Port Already in Use
-If port 5173 is occupied, Vite will automatically use the next available port.
-
-### Mobile Connection Issues
-- Ensure devices are on the same network
-- Check firewall settings
-- Try using your computer's local IP instead of localhost
-
-### Build Errors
-- Clear node_modules and reinstall: `rm -rf node_modules && npm install`
-- Check Node.js version compatibility
-
-## Support
-
-For issues or questions, please check the documentation or create an issue in the repository.
+This system is intended to supplement, not replace, professional medical care. Always consult with healthcare providers for medical advice.
