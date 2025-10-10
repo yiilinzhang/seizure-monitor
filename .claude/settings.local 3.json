@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(npx react-native start:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(git add:*)",
+      "Bash(git log:*)",
+      "Bash(git commit:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(curl -X POST http://localhost:8000/api/v1/auth/register )",
+      "Bash(curl -X POST http://localhost:8000/api/v1/auth/register -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"test2@example.com\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"testpass123\"\"\"\",\"\"\"\"name\"\"\"\":\"\"\"\"Test User2\"\"\"\"}' -s)",
+      "Bash(curl -X POST http://localhost:8000/api/v1/auth/register -H \"Content-Type: application/json\" -d '{\"\"email\"\":\"\"test2@example.com\"\",\"\"password\"\":\"\"testpass123\"\",\"\"name\"\":\"\"Test User2\"\"}')"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
