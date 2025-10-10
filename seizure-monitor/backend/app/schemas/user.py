@@ -17,18 +17,21 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     password: Optional[str] = None
 
-class UserResponse(UserBase):
+class UserInfo(UserBase):
     id: str
     created_at: datetime
-    token: Optional[str] = None
 
     class Config:
         from_attributes = True
 
+class UserResponse(BaseModel):
+    token: str
+    user: UserInfo
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: UserResponse
+    user: UserInfo
 
 class PasswordUpdate(BaseModel):
     current_password: str

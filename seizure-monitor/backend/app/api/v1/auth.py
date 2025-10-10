@@ -47,10 +47,13 @@ async def register(
     )
 
     return {
-        "id": new_user.id,
-        "email": new_user.email,
-        "name": new_user.name,
-        "token": access_token
+        "token": access_token,
+        "user": {
+            "id": new_user.id,
+            "email": new_user.email,
+            "name": new_user.name,
+            "created_at": new_user.created_at
+        }
     }
 
 @router.post("/login", response_model=Token)
@@ -82,6 +85,7 @@ async def login(
         "user": {
             "id": user.id,
             "email": user.email,
-            "name": user.name
+            "name": user.name,
+            "created_at": user.created_at
         }
     }
