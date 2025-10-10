@@ -29,7 +29,15 @@ async def get_contacts(
     contacts = result.scalars().all()
 
     return {
-        "contacts": contacts,
+        "contacts": [
+            {
+                "id": contact.id,
+                "name": contact.name,
+                "phone_number": contact.phone_number,
+                "created_at": contact.created_at
+            }
+            for contact in contacts
+        ],
         "count": len(contacts)
     }
 
@@ -68,7 +76,12 @@ async def add_contact(
 
     return {
         "message": "Contact added successfully",
-        "contact": new_contact
+        "contact": {
+            "id": new_contact.id,
+            "name": new_contact.name,
+            "phone_number": new_contact.phone_number,
+            "created_at": new_contact.created_at
+        }
     }
 
 @router.put("/{contact_id}", response_model=dict)
@@ -106,7 +119,12 @@ async def update_contact(
 
     return {
         "message": "Contact updated successfully",
-        "contact": contact
+        "contact": {
+            "id": contact.id,
+            "name": contact.name,
+            "phone_number": contact.phone_number,
+            "created_at": contact.created_at
+        }
     }
 
 @router.delete("/{contact_id}", response_model=dict)

@@ -80,9 +80,15 @@ class ApiService {
     }
 
     const data = await response.json();
-    this.token = data.token;
-    await AsyncStorage.setItem('authToken', data.token);
+    // Handle both token formats
+    const token = data.token || data.access_token;
+    this.token = token;
+    await AsyncStorage.setItem('authToken', token);
     await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+    // Ensure token is set for immediate use
+    await this.loadToken();
+
     return data;
   }
 
@@ -111,7 +117,10 @@ class ApiService {
 
   // Emergency contacts methods
   async getContacts(): Promise<Contact[]> {
-    const response = await fetch(`${API_URL}/contacts`, {
+    // Ensure token is loaded
+    await this.loadToken();
+
+    const response = await fetch(`${API_URL}/contacts/`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
@@ -129,7 +138,10 @@ class ApiService {
   }
 
   async addContact(name: string, phoneNumber: string): Promise<Contact> {
-    const response = await fetch(`${API_URL}/contacts`, {
+    // Ensure token is loaded
+    await this.loadToken();
+
+    const response = await fetch(`${API_URL}/contacts/`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ name, phone_number: phoneNumber }),
@@ -137,7 +149,11 @@ class ApiService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to add contact');
+      // Handle specific error cases
+      if (response.status === 409) {
+        throw new Error('A contact with this phone number already exists');
+      }
+      throw new Error(error.detail || error.error || 'Failed to add contact');
     }
 
     const data = await response.json();
@@ -153,7 +169,13 @@ class ApiService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to update contact');
+      if (response.status === 404) {
+        throw new Error('Contact not found');
+      }
+      if (response.status === 409) {
+        throw new Error('A contact with this phone number already exists');
+      }
+      throw new Error(error.detail || error.error || 'Failed to update contact');
     }
 
     const data = await response.json();
@@ -168,7 +190,10 @@ class ApiService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to delete contact');
+      if (response.status === 404) {
+        throw new Error('Contact not found');
+      }
+      throw new Error(error.detail || error.error || 'Failed to delete contact');
     }
   }
 

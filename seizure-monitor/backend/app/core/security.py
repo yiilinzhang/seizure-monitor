@@ -48,7 +48,10 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
             algorithms=[settings.JWT_ALGORITHM]
         )
         return payload
-    except JWTError:
+    except JWTError as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"JWT decode error: {str(e)}")
         return None
 
 def create_refresh_token(data: Dict[str, Any]) -> str:

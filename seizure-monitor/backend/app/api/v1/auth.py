@@ -58,17 +58,17 @@ async def register(
 
 @router.post("/login", response_model=Token)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    user_data: UserLogin,
     db: AsyncSession = Depends(get_session)
 ):
     """Login user and return JWT token"""
     # Find user
     result = await db.execute(
-        select(User).where(User.email == form_data.username)
+        select(User).where(User.email == user_data.email)
     )
     user = result.scalars().first()
 
-    if not user or not verify_password(form_data.password, user.password):
+    if not user or not verify_password(user_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -80,6 +80,7 @@ async def login(
     )
 
     return {
+        "token": access_token,
         "access_token": access_token,
         "token_type": "bearer",
         "user": {
