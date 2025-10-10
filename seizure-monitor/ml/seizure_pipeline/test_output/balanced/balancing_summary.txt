@@ -1,8 +1,0 @@
-Dataset Balancing Summary
-==================================================
-
-original_samples: 383,656 samples
-temporal_balanced: 8,481 samples
-event_balanced: 6,096 samples
-focal_balanced: 30,673 samples
-sequence_ready: 383,656 samples
