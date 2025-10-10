@@ -29,22 +29,22 @@ export const LiveMonitor: React.FC = () => {
   // Simulate real-time updates
   useEffect(() => {
     const interval = setInterval(() => {
-      // Simulate random risk changes for demo
+      // Cycle through risk levels for demo (equal probability)
       const random = Math.random();
-      if (random < 0.7) {
+      if (random < 0.33) {
         setSeizureRisk('low');
         setTimeToSeizure(undefined);
         setAiConfidence(Math.floor(Math.random() * 20) + 75); // 75-95%
-      } else if (random < 0.9) {
+      } else if (random < 0.66) {
         setSeizureRisk('medium');
-        setTimeToSeizure(Math.floor(Math.random() * 20) + 10); // 10-30 minutes
+        setTimeToSeizure(Math.floor(Math.random() * 60) + 60); // 60-120 minutes (1-2 hours)
         setAiConfidence(Math.floor(Math.random() * 15) + 70); // 70-85%
       } else {
         setSeizureRisk('high');
         setTimeToSeizure(Math.floor(Math.random() * 10) + 1); // 1-10 minutes
         setAiConfidence(Math.floor(Math.random() * 10) + 80); // 80-90%
       }
-    }, 5000); // Update every 5 seconds for demo
+    }, 3000); // Update every 3 seconds for demo
 
     return () => clearInterval(interval);
   }, []);
