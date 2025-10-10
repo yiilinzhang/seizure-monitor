@@ -14,9 +14,6 @@ from app.services.twilio_service import TwilioService
 
 router = APIRouter()
 
-# Initialize Twilio service
-twilio_service = TwilioService()
-
 @router.post("/trigger", response_model=EmergencyResponse)
 async def trigger_emergency(
     trigger_data: EmergencyTrigger,
@@ -67,6 +64,9 @@ async def trigger_emergency(
         "delta_pct": trigger_data.delta_pct,
         "timestamp": trigger_data.timestamp
     }
+
+    # Initialize Twilio service for each request to get fresh environment variables
+    twilio_service = TwilioService()
 
     for contact in contacts:
         print(f"Processing emergency notifications for {contact.name} ({contact.phone_number})")

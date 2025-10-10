@@ -1,15 +1,15 @@
 from twilio.rest import Client
 from datetime import datetime
-import os
 from typing import Dict, Any
+from app.core.config import settings
 
 class TwilioService:
     def __init__(self):
         self.client = None
-        if os.getenv("TWILIO_ACCOUNT_SID") and os.getenv("TWILIO_AUTH_TOKEN"):
+        if settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN:
             self.client = Client(
-                os.getenv("TWILIO_ACCOUNT_SID"),
-                os.getenv("TWILIO_AUTH_TOKEN")
+                settings.TWILIO_ACCOUNT_SID,
+                settings.TWILIO_AUTH_TOKEN
             )
 
     async def send_sms(self, phone_number: str, user_name: str, event_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -17,6 +17,9 @@ class TwilioService:
         if not self.client:
             print("Twilio not configured - SMS simulated")
             return {"success": False, "error": "Twilio not configured"}
+
+        # Clean phone number - remove any spaces
+        phone_number = phone_number.replace(" ", "").strip()
 
         location = event_data["location"]
         delta_pct = event_data["delta_pct"]
@@ -31,9 +34,13 @@ Sensor spike: {delta_pct}% above threshold
 Emergency services have been notified."""
 
         try:
+            # Debug logging
+            print(f"DEBUG: Sending SMS from {settings.TWILIO_PHONE_NUMBER} to {phone_number}")
+            print(f"DEBUG: Phone number type: {type(phone_number)}, value: '{phone_number}'")
+
             result = self.client.messages.create(
                 body=message,
-                from_=os.getenv("TWILIO_PHONE_NUMBER"),
+                from_=settings.TWILIO_PHONE_NUMBER,
                 to=phone_number
             )
             print(f"SMS sent successfully to {phone_number}: {result.sid}")
@@ -48,6 +55,9 @@ Emergency services have been notified."""
             print("Twilio not configured - Call simulated")
             return {"success": False, "error": "Twilio not configured"}
 
+        # Clean phone number - remove any spaces
+        phone_number = phone_number.replace(" ", "").strip()
+
         try:
             twiml = f"""<Response>
                 <Say voice="alice" loop="2">{user_name} is experiencing a seizure now. You have been designated an emergency contact. Please check your SMS for their exact location. Emergency services have been called.</Say>
@@ -58,7 +68,7 @@ Emergency services have been notified."""
             call = self.client.calls.create(
                 twiml=twiml,
                 to=phone_number,
-                from_=os.getenv("TWILIO_PHONE_NUMBER")
+                from_=settings.TWILIO_PHONE_NUMBER
             )
             print(f"Voice call initiated to {phone_number}: {call.sid}")
             return {"success": True, "sid": call.sid}

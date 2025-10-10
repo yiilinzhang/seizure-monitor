@@ -7,17 +7,28 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Convert sync PostgreSQL URL to async
-DATABASE_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+# Handle different database URLs
+DATABASE_URL = settings.DATABASE_URL
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
-# Create async engine
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=settings.DEBUG,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    poolclass=NullPool if settings.DEBUG else None,
-)
+# Create async engine with appropriate configuration
+if DATABASE_URL.startswith("sqlite"):
+    # SQLite configuration (no pool settings with NullPool)
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=settings.DEBUG,
+        poolclass=NullPool,
+    )
+else:
+    # PostgreSQL configuration
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=settings.DEBUG,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW,
+        poolclass=NullPool if settings.DEBUG else None,
+    )
 
 # Create async session factory
 async_session = async_sessionmaker(

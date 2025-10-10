@@ -11,8 +11,10 @@ import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Settings: React.FC = () => {
+  const { logout } = useAuth();
   const [userName, setUserName] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
@@ -388,7 +390,7 @@ export const Settings: React.FC = () => {
         <Card style={{ marginTop: 24 }}>
           <Button
             variant="destructive"
-            onPress={async () => {
+            onPress={() => {
               Alert.alert(
                 'Logout',
                 'Are you sure you want to logout?',
@@ -398,8 +400,12 @@ export const Settings: React.FC = () => {
                     text: 'Logout',
                     style: 'destructive',
                     onPress: async () => {
-                      await apiService.logout();
-                      // Navigation will be handled by the main App component
+                      try {
+                        await logout();
+                      } catch (error) {
+                        console.error('Logout error:', error);
+                        Alert.alert('Error', 'Failed to logout. Please try again.');
+                      }
                     },
                   },
                 ]

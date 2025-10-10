@@ -1,44 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Layout } from '../components/Layout';
 import { Chip } from '../components/Chip';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { Toggle } from '../components/Toggle';
-import { LineChart } from 'react-native-chart-kit';
-
-const generateMockData = () => {
-  const data = [];
-  for (let i = 0; i < 60; i++) {
-    const baseValue = 100 + Math.sin(i / 10) * 15;
-    const noise = Math.random() * 5;
-    data.push(baseValue + noise);
-  }
-  return data;
-};
+import { SeizurePrediction } from '../components/SeizurePrediction';
+import { HealthMetricsTabs } from '../components/HealthMetricsTabs';
 
 export const LiveMonitor: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
-  const [smoothing, setSmoothing] = useState(0.5);
-  const [showBaseline, setShowBaseline] = useState(true);
-  const [threshold, setThreshold] = useState(15);
-  const [duration, setDuration] = useState(5);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertCountdown, setAlertCountdown] = useState(10);
 
-  const chartData = generateMockData();
-  const deltaPercent = '+18%';
-  const isAlert = true;
+  // Mock data for seizure prediction - in real app this would come from your ML model/API
+  const [seizureRisk, setSeizureRisk] = useState<'low' | 'medium' | 'high'>('low');
+  const [timeToSeizure, setTimeToSeizure] = useState<number | undefined>(undefined);
+  const [aiConfidence, setAiConfidence] = useState(85);
 
-  const triggerAlert = () => {
+  // Simulate real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Simulate random risk changes for demo
+      const random = Math.random();
+      if (random < 0.7) {
+        setSeizureRisk('low');
+        setTimeToSeizure(undefined);
+        setAiConfidence(Math.floor(Math.random() * 20) + 75); // 75-95%
+      } else if (random < 0.9) {
+        setSeizureRisk('medium');
+        setTimeToSeizure(Math.floor(Math.random() * 20) + 10); // 10-30 minutes
+        setAiConfidence(Math.floor(Math.random() * 15) + 70); // 70-85%
+      } else {
+        setSeizureRisk('high');
+        setTimeToSeizure(Math.floor(Math.random() * 10) + 1); // 1-10 minutes
+        setAiConfidence(Math.floor(Math.random() * 10) + 80); // 80-90%
+      }
+    }, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // Simulate fetching new data
+    setTimeout(() => {
+      setRefreshing(false);
+      Alert.alert('Data Refreshed', 'Latest readings have been updated');
+    }, 2000);
+  }, []);
+
+  const triggerEmergencyAlert = () => {
     setShowAlert(true);
     let count = 10;
     const interval = setInterval(() => {
@@ -48,11 +68,26 @@ export const LiveMonitor: React.FC = () => {
         clearInterval(interval);
         setShowAlert(false);
         setAlertCountdown(10);
+        Alert.alert('Emergency', 'Emergency contacts have been notified');
       }
     }, 1000);
   };
 
-  const screenWidth = Dimensions.get('window').width;
+  const handleManualEvent = () => {
+    Alert.alert(
+      'Mark Seizure Event',
+      'Are you sure you want to manually mark a seizure event?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            triggerEmergencyAlert();
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <Layout
@@ -74,7 +109,7 @@ export const LiveMonitor: React.FC = () => {
                 position: 'absolute',
                 right: 0,
                 top: 40,
-                width: 150,
+                width: 180,
                 backgroundColor: '#FFFFFF',
                 borderRadius: 12,
                 shadowColor: '#000',
@@ -92,267 +127,130 @@ export const LiveMonitor: React.FC = () => {
                   Alert.alert('Re-baseline', 'Re-baseline initiated');
                 }}
               >
-                <Text style={{ fontSize: 14, color: '#3D3D3D' }}>
-                  Re-baseline
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name="refresh-cw" size={16} color="#3D3D3D" />
+                  <Text style={{ fontSize: 14, color: '#3D3D3D', marginLeft: 8 }}>
+                    Re-baseline
+                  </Text>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ padding: 12 }}
                 onPress={() => {
                   setShowMenu(false);
-                  Alert.alert('Thresholds', 'Set thresholds');
+                  Alert.alert('Thresholds', 'Configure alert thresholds in Settings');
                 }}
               >
-                <Text style={{ fontSize: 14, color: '#3D3D3D' }}>
-                  Set thresholds
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name="sliders" size={16} color="#3D3D3D" />
+                  <Text style={{ fontSize: 14, color: '#3D3D3D', marginLeft: 8 }}>
+                    Set thresholds
+                  </Text>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ padding: 12 }}
                 onPress={() => {
                   setShowMenu(false);
-                  Alert.alert('Device Info', 'Device information');
+                  Alert.alert(
+                    'Device Info',
+                    'Device: ESP32\nFirmware: v2.1.0\nBattery: 87%\nSignal: Strong'
+                  );
                 }}
               >
-                <Text style={{ fontSize: 14, color: '#3D3D3D' }}>
-                  Device info
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name="info" size={16} color="#3D3D3D" />
+                  <Text style={{ fontSize: 14, color: '#3D3D3D', marginLeft: 8 }}>
+                    Device info
+                  </Text>
+                </View>
               </TouchableOpacity>
             </View>
           )}
         </View>
       }
     >
-      <View style={{ marginTop: 16 }}>
-        <Chip variant="connected" />
-      </View>
-
-      <Card style={{ marginTop: 24 }}>
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: '600',
-            color: isAlert ? '#FF8383' : '#83D49B',
-          }}
-        >
-          {deltaPercent}
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: 12,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="activity" size={16} color="#8A8A8A" />
-            <Text
-              style={{
-                fontSize: 14,
-                color: '#8A8A8A',
-                marginLeft: 4,
-              }}
-            >
-              Baseline: 120 kΩ
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="thermometer" size={16} color="#8A8A8A" />
-            <Text
-              style={{
-                fontSize: 14,
-                color: '#8A8A8A',
-                marginLeft: 4,
-                marginRight: 12,
-              }}
-            >
-              24°C
-            </Text>
-            <Icon name="droplet" size={16} color="#8A8A8A" />
-            <Text
-              style={{
-                fontSize: 14,
-                color: '#8A8A8A',
-                marginLeft: 4,
-              }}
-            >
-              45%
-            </Text>
-          </View>
-        </View>
-      </Card>
-
-      <Card style={{ marginTop: 24 }}>
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: '600',
-            color: '#3D3D3D',
-            marginBottom: 16,
-          }}
-        >
-          Menthone (relative)
-        </Text>
-        <LineChart
-          data={{
-            labels: [],
-            datasets: [
-              {
-                data: chartData,
-              },
-            ],
-          }}
-          width={screenWidth - 64}
-          height={200}
-          yAxisLabel=""
-          yAxisSuffix=""
-          yAxisInterval={1}
-          chartConfig={{
-            backgroundColor: '#FFFFFF',
-            backgroundGradientFrom: '#FFFFFF',
-            backgroundGradientTo: '#FFFFFF',
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(135, 174, 238, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(138, 138, 138, ${opacity})`,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: '0',
-            },
-          }}
-          bezier
-          style={{
-            marginVertical: 8,
-            borderRadius: 16,
-          }}
-          withInnerLines={true}
-          withOuterLines={false}
-          withHorizontalLabels={true}
-          withVerticalLabels={false}
-        />
-
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#87AEEE"
+          />
+        }
+      >
+        {/* Connection Status */}
         <View style={{ marginTop: 16 }}>
-          <View style={{ marginBottom: 16 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                marginBottom: 8,
-              }}
-            >
-              <Text style={{ fontSize: 14, color: '#8A8A8A' }}>
-                Smoothing
-              </Text>
-              <Text style={{ fontSize: 14, color: '#3D3D3D' }}>
-                {smoothing.toFixed(1)}
-              </Text>
-            </View>
-            <View
-              style={{
-                height: 40,
-                backgroundColor: '#F0F0F0',
-                borderRadius: 8,
-                padding: 4,
-              }}
-            >
-              <View
-                style={{
-                  width: `${smoothing * 100}%`,
-                  height: '100%',
-                  backgroundColor: '#87AEEE',
-                  borderRadius: 6,
-                }}
-              />
-            </View>
-          </View>
-          <Toggle
-            label="Show baseline"
-            checked={showBaseline}
-            onChange={setShowBaseline}
+          <Chip variant="connected" />
+        </View>
+
+        {/* Seizure Prediction Block */}
+        <View style={{ marginTop: 24 }}>
+          <SeizurePrediction
+            riskLevel={seizureRisk}
+            timeToSeizure={timeToSeizure}
+            confidenceLevel={aiConfidence}
           />
         </View>
-      </Card>
 
-      <Card style={{ marginTop: 24 }}>
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: '600',
-            color: '#3D3D3D',
-            marginBottom: 16,
-          }}
-        >
-          Controls
-        </Text>
-
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 14, color: '#8A8A8A', marginBottom: 8 }}>
-            Threshold: {threshold}%
-          </Text>
-          <View
-            style={{
-              height: 40,
-              backgroundColor: '#F0F0F0',
-              borderRadius: 8,
-              padding: 4,
-            }}
-          >
-            <View
-              style={{
-                width: `${(threshold / 50) * 100}%`,
-                height: '100%',
-                backgroundColor: '#87AEEE',
-                borderRadius: 6,
-              }}
-            />
-          </View>
+        {/* Health Metrics Tabs */}
+        <View style={{ marginTop: 24 }}>
+          <HealthMetricsTabs />
         </View>
 
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 14, color: '#8A8A8A', marginBottom: 8 }}>
-            Duration: {duration}s
-          </Text>
-          <View
+        {/* Quick Actions */}
+        <Card style={{ marginTop: 24, marginBottom: 24 }}>
+          <Text
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(138, 138, 138, 0.2)',
-              borderRadius: 12,
-              padding: 12,
+              fontSize: 18,
+              fontWeight: '600',
+              color: '#3D3D3D',
+              marginBottom: 16,
             }}
           >
+            Quick Actions
+          </Text>
+
+          <View style={{ gap: 12 }}>
+            <Button onPress={handleManualEvent} fullWidth>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="alert-circle" size={18} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', marginLeft: 8, fontSize: 16, fontWeight: '600' }}>
+                  Mark Seizure Event
+                </Text>
+              </View>
+            </Button>
+
             <TouchableOpacity
-              onPress={() => setDuration(Math.max(1, duration - 1))}
-              style={{ padding: 4 }}
-            >
-              <Icon name="minus" size={20} color="#8A8A8A" />
-            </TouchableOpacity>
-            <Text
               style={{
-                flex: 1,
-                textAlign: 'center',
-                fontSize: 16,
-                color: '#3D3D3D',
+                padding: 12,
+                borderWidth: 1,
+                borderColor: '#E0E0E0',
+                borderRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
+              onPress={() => Alert.alert('Export Data', 'Data export started')}
             >
-              {duration}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setDuration(Math.min(30, duration + 1))}
-              style={{ padding: 4 }}
-            >
-              <Icon name="plus" size={20} color="#8A8A8A" />
+              <Icon name="download" size={18} color="#8A8A8A" />
+              <Text
+                style={{
+                  color: '#8A8A8A',
+                  marginLeft: 8,
+                  fontSize: 14,
+                  fontWeight: '500',
+                }}
+              >
+                Export Today's Data
+              </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Card>
+      </ScrollView>
 
-        <Button onPress={triggerAlert} fullWidth>
-          Mark Event (manual)
-        </Button>
-      </Card>
-
+      {/* Emergency Alert Overlay */}
       {showAlert && (
         <View
           style={{
@@ -362,24 +260,41 @@ export const LiveMonitor: React.FC = () => {
             right: 0,
             backgroundColor: '#FF8383',
             padding: 16,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
           }}
         >
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Icon name="alert-octagon" size={24} color="#FFFFFF" />
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 16,
+                fontWeight: '600',
+                marginLeft: 8,
+              }}
+            >
+              Emergency Alert Active
+            </Text>
+          </View>
           <Text
             style={{
               color: '#FFFFFF',
-              fontSize: 16,
-              fontWeight: '600',
+              fontSize: 14,
               marginBottom: 12,
             }}
           >
-            Detection ongoing... calling in {alertCountdown}s
+            Notifying emergency contacts in {alertCountdown} seconds...
           </Text>
           <Button
             variant="secondary"
-            onPress={() => setShowAlert(false)}
+            onPress={() => {
+              setShowAlert(false);
+              setAlertCountdown(10);
+            }}
             fullWidth
           >
-            Cancel
+            Cancel Alert
           </Button>
         </View>
       )}

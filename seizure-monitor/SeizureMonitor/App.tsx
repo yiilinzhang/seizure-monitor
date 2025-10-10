@@ -1,28 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { StatusBar, View, ActivityIndicator, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Login } from './src/components/Login';
-import { apiService } from './src/services/api';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const authenticated = await apiService.isAuthenticated();
-      setIsAuthenticated(authenticated);
-    } catch (error) {
-      console.error('Auth check error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+function AppContent() {
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
@@ -46,9 +30,17 @@ function App() {
       {isAuthenticated ? (
         <AppNavigator />
       ) : (
-        <Login onSuccess={() => setIsAuthenticated(true)} />
+        <Login />
       )}
     </SafeAreaProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

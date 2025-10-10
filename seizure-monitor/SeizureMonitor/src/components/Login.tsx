@@ -10,13 +10,10 @@ import {
 } from 'react-native';
 import { Card } from './Card';
 import { Button } from './Button';
-import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
-interface LoginProps {
-  onSuccess: () => void;
-}
-
-export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
+export const Login: React.FC = () => {
+  const { login, register } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,11 +35,10 @@ export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
 
     try {
       if (isRegistering) {
-        await apiService.register(email, password, name);
+        await register(email, password, name);
       } else {
-        await apiService.login(email, password);
+        await login(email, password);
       }
-      onSuccess();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Authentication failed');
     } finally {
