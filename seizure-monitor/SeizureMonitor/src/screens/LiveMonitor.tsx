@@ -44,7 +44,7 @@ export const LiveMonitor: React.FC = () => {
         setTimeToSeizure(Math.floor(Math.random() * 10) + 1); // 1-10 minutes
         setAiConfidence(Math.floor(Math.random() * 10) + 80); // 80-90%
       }
-    }, 30000); // Update every 30 seconds
+    }, 5000); // Update every 5 seconds for demo
 
     return () => clearInterval(interval);
   }, []);
