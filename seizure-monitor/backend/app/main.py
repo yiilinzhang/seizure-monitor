@@ -4,7 +4,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from app.api.v1 import auth, contacts, emergency
+from app.api.v1 import auth, contacts, emergency, sensor_data
 from app.core.config import settings
 from app.core.database import create_db_and_tables
 from app.websocket.handlers import websocket_endpoint
@@ -54,6 +54,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(contacts.router, prefix="/api/v1/contacts", tags=["Contacts"])
 app.include_router(emergency.router, prefix="/api/v1", tags=["Emergency"])
+app.include_router(sensor_data.router, prefix="/api/v1", tags=["Sensor Data"])
 
 # WebSocket endpoint
 app.add_api_websocket_route("/ws", websocket_endpoint)

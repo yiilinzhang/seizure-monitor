@@ -14,11 +14,15 @@ class ConnectionManager:
         if client_id in self.active_connections:
             del self.active_connections[client_id]
 
-    async def send_personal_message(self, message: str, client_id: str):
+    async def send_personal_message(self, message: str | dict, client_id: str):
         if client_id in self.active_connections:
+            if isinstance(message, dict):
+                message = json.dumps(message)
             await self.active_connections[client_id].send_text(message)
 
-    async def broadcast(self, message: str):
+    async def broadcast(self, message: str | dict):
+        if isinstance(message, dict):
+            message = json.dumps(message)
         for connection in self.active_connections.values():
             await connection.send_text(message)
 

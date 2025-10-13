@@ -1,0 +1,14 @@
+{
+  "features": [
+    "hr",
+    "hrv",
+    "eeg_delta",
+    "eeg_theta",
+    "eeg_alpha",
+    "eeg_beta",
+    "emg_rms",
+    "emg_var",
+    "mov_mag",
+    "mov_std"
+  ]
+}

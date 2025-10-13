@@ -1,83 +1,99 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { Card } from './Card';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSensorData } from '../contexts/SensorDataContext';
 
-interface TabData {
+interface TabConfig {
   id: string;
   title: string;
-  data: number[];
   unit: string;
   color: string;
   icon: string;
-  currentValue: number;
   normalRange: string;
+  dataKey: keyof ReturnType<typeof useSensorData>;
 }
 
-const generateMockData = (baseValue: number, variation: number) => {
-  const data = [];
-  for (let i = 0; i < 60; i++) {
-    const value = baseValue + Math.sin(i / 10) * variation + Math.random() * 5;
-    data.push(Math.max(0, value));
-  }
-  return data;
-};
-
-const tabs: TabData[] = [
+const tabConfigs: TabConfig[] = [
   {
     id: 'menthone',
     title: 'Menthone',
-    data: generateMockData(100, 15),
     unit: 'kΩ',
     color: '#87AEEE',
     icon: 'activity',
-    currentValue: 115,
     normalRange: '80-120',
+    dataKey: 'menthoneData',
   },
   {
     id: 'heartrate',
     title: 'Heart Rate',
-    data: generateMockData(75, 10),
     unit: 'bpm',
     color: '#FF8383',
     icon: 'heart',
-    currentValue: 78,
     normalRange: '60-100',
+    dataKey: 'heartRateData',
   },
   {
     id: 'spo2',
     title: 'SpO2',
-    data: generateMockData(97, 2),
     unit: '%',
     color: '#83D49B',
     icon: 'droplet',
-    currentValue: 98,
     normalRange: '95-100',
+    dataKey: 'spo2Data',
   },
   {
     id: 'emg',
     title: 'EMG Level',
-    data: generateMockData(50, 20),
     unit: 'μV',
     color: '#FFB366',
     icon: 'zap',
-    currentValue: 52,
     normalRange: '20-80',
+    dataKey: 'emgData',
   },
 ];
 
 export const HealthMetricsTabs: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('menthone');
   const screenWidth = Dimensions.get('window').width;
+  const sensorData = useSensorData();
 
-  const activeTabData = tabs.find(tab => tab.id === activeTab) || tabs[0];
+  const activeTabConfig = useMemo(() =>
+    tabConfigs.find(tab => tab.id === activeTab) || tabConfigs[0],
+    [activeTab]
+  );
+
+  // Get data and current value for active tab
+  const data = useMemo(() => {
+    const dataArray = sensorData[activeTabConfig.dataKey] as number[];
+    return dataArray && dataArray.length > 0 ? dataArray : [0];
+  }, [sensorData, activeTabConfig.dataKey]);
+
+  const currentValue = useMemo(() => {
+    if (data.length > 1 && data[data.length - 1] !== 0) {
+      return data[data.length - 1];
+    }
+    // Fallback to latest data from sensor
+    if (sensorData.latestData) {
+      const fieldMap: Record<string, keyof typeof sensorData.latestData> = {
+        'menthone': 'menthone_resistance',
+        'heartrate': 'heart_rate',
+        'spo2': 'spo2',
+        'emg': 'emg_level',
+      };
+      const field = fieldMap[activeTab];
+      return sensorData.latestData[field] || 0;
+    }
+    return 0;
+  }, [data, sensorData.latestData, activeTab]);
 
   return (
     <View>
@@ -96,7 +112,7 @@ export const HealthMetricsTabs: React.FC = () => {
             gap: 12,
           }}
         >
-          {tabs.map((tab) => (
+          {tabConfigs.map((tab) => (
             <TouchableOpacity
               key={tab.id}
               onPress={() => setActiveTab(tab.id)}
@@ -154,7 +170,7 @@ export const HealthMetricsTabs: React.FC = () => {
               color: '#3D3D3D',
             }}
           >
-            {activeTabData.title}
+            {activeTabConfig.title}
           </Text>
           <View
             style={{
@@ -163,23 +179,29 @@ export const HealthMetricsTabs: React.FC = () => {
               gap: 4,
             }}
           >
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: '700',
-                color: activeTabData.color,
-              }}
-            >
-              {activeTabData.currentValue}
-            </Text>
-            <Text
-              style={{
-                fontSize: 14,
-                color: '#8A8A8A',
-              }}
-            >
-              {activeTabData.unit}
-            </Text>
+            {sensorData.isLoading ? (
+              <ActivityIndicator size="small" color={activeTabConfig.color} />
+            ) : (
+              <>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: '700',
+                    color: activeTabConfig.color,
+                  }}
+                >
+                  {currentValue ? Math.round(currentValue * 10) / 10 : '--'}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: '#8A8A8A',
+                  }}
+                >
+                  {activeTabConfig.unit}
+                </Text>
+              </>
+            )}
           </View>
         </View>
 
@@ -203,55 +225,75 @@ export const HealthMetricsTabs: React.FC = () => {
               marginLeft: 6,
             }}
           >
-            Normal range: {activeTabData.normalRange} {activeTabData.unit}
+            Normal range: {activeTabConfig.normalRange} {activeTabConfig.unit}
           </Text>
         </View>
 
         {/* Chart */}
-        <LineChart
-          data={{
-            labels: [],
-            datasets: [
-              {
-                data: activeTabData.data,
+        {data.length > 0 ? (
+          <LineChart
+            data={{
+              labels: [],
+              datasets: [
+                {
+                  data: data,
+                },
+              ],
+            }}
+            width={screenWidth - 64}
+            height={200}
+            yAxisLabel=""
+            yAxisSuffix=""
+            yAxisInterval={1}
+            chartConfig={{
+              backgroundColor: '#FFFFFF',
+              backgroundGradientFrom: '#FFFFFF',
+              backgroundGradientTo: '#FFFFFF',
+              decimalPlaces: 0,
+              color: (opacity = 1) =>
+                activeTabConfig.color.replace(')', `, ${opacity})`).replace('rgb', 'rgba'),
+              labelColor: (opacity = 1) => `rgba(138, 138, 138, ${opacity})`,
+              style: {
+                borderRadius: 16,
               },
-            ],
-          }}
-          width={screenWidth - 64}
-          height={200}
-          yAxisLabel=""
-          yAxisSuffix=""
-          yAxisInterval={1}
-          chartConfig={{
-            backgroundColor: '#FFFFFF',
-            backgroundGradientFrom: '#FFFFFF',
-            backgroundGradientTo: '#FFFFFF',
-            decimalPlaces: 0,
-            color: (opacity = 1) =>
-              activeTabData.color.replace(')', `, ${opacity})`).replace('rgb', 'rgba'),
-            labelColor: (opacity = 1) => `rgba(138, 138, 138, ${opacity})`,
-            style: {
+              propsForDots: {
+                r: '0',
+              },
+              propsForBackgroundLines: {
+                strokeDasharray: '5, 5',
+                stroke: '#F0F0F0',
+                strokeWidth: 1,
+              },
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
               borderRadius: 16,
-            },
-            propsForDots: {
-              r: '0',
-            },
-            propsForBackgroundLines: {
-              strokeDasharray: '5, 5',
-              stroke: '#F0F0F0',
-              strokeWidth: 1,
-            },
-          }}
-          bezier
-          style={{
-            marginVertical: 8,
-            borderRadius: 16,
-          }}
-          withInnerLines={true}
-          withOuterLines={false}
-          withHorizontalLabels={true}
-          withVerticalLabels={false}
-        />
+            }}
+            withInnerLines={true}
+            withOuterLines={false}
+            withHorizontalLabels={true}
+            withVerticalLabels={false}
+          />
+        ) : (
+          <View
+            style={{
+              height: 200,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Icon name="activity" size={48} color="#E0E0E0" />
+            <Text style={{ color: '#8A8A8A', marginTop: 12 }}>
+              {sensorData.isLoading ? 'Loading data...' : 'No data available'}
+            </Text>
+            {!sensorData.isConnected && !sensorData.isLoading && (
+              <Text style={{ color: '#8A8A8A', fontSize: 12, marginTop: 4 }}>
+                Waiting for sensor connection
+              </Text>
+            )}
+          </View>
+        )}
 
         {/* Time Range Indicator */}
         <View

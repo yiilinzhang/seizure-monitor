@@ -30,5 +30,29 @@ target 'SeizureMonitor' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Fix for react-native-vector-icons duplicate resources
+    installer.target_installation_results.pod_target_installation_results.each do |pod_name, target_installation_result|
+      if pod_name == 'RNVectorIcons'
+        target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
+          resource_bundle_target.build_configurations.each do |config|
+            config.build_settings['CONFIGURATION_BUILD_DIR'] = '$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/RNVectorIcons'
+          end
+        end
+      end
+    end
+
+    # Remove font files from app target's Copy Bundle Resources phase
+    installer.pods_project.targets.each do |target|
+      target.build_phases.each do |build_phase|
+        if build_phase.is_a?(Xcodeproj::Project::Object::PBXResourcesBuildPhase)
+          build_phase.files.each do |build_file|
+            if build_file.file_ref && build_file.file_ref.path && build_file.file_ref.path.end_with?('.ttf')
+              build_phase.files.delete(build_file)
+            end
+          end
+        end
+      end
+    end
   end
 end

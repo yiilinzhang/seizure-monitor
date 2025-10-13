@@ -247,6 +247,64 @@ class ApiService {
       throw new Error(error.error || 'Failed to update password');
     }
   }
+
+  // Sensor data methods
+  async getLatestSensorData(): Promise<any> {
+    await this.loadToken();
+
+    const response = await fetch(`${API_URL}/sensor-data/latest`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        await this.logout();
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error('Failed to fetch sensor data');
+    }
+
+    return response.json();
+  }
+
+  async getSensorDataHistory(hours: number = 24): Promise<any> {
+    await this.loadToken();
+
+    const response = await fetch(`${API_URL}/sensor-data/history?hours=${hours}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        await this.logout();
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error('Failed to fetch sensor history');
+    }
+
+    return response.json();
+  }
+
+  async getSensorStats(metric: string, hours: number = 24): Promise<any> {
+    await this.loadToken();
+
+    const response = await fetch(`${API_URL}/sensor-data/stats/${metric}?hours=${hours}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        await this.logout();
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error('Failed to fetch sensor stats');
+    }
+
+    return response.json();
+  }
 }
 
 export const apiService = new ApiService();

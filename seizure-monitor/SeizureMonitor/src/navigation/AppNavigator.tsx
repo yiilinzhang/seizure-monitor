@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/Feather';
+import { SensorDataProvider } from '../contexts/SensorDataContext';
 
 // Import screens (we'll create these next)
 import { LiveMonitor } from '../screens/LiveMonitor';
@@ -14,7 +15,8 @@ const Tab = createBottomTabNavigator();
 
 export const AppNavigator = () => {
   return (
-    <NavigationContainer>
+    <SensorDataProvider>
+      <NavigationContainer>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -78,5 +80,6 @@ export const AppNavigator = () => {
         />
       </Tab.Navigator>
     </NavigationContainer>
+    </SensorDataProvider>
   );
 };

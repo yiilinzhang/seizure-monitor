@@ -1,0 +1,1 @@
+Split 125 cases in SeizureiT2 databsed to sets fo 5 and converted it to csv file 

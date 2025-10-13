@@ -17,3 +17,4 @@ class User(Base):
     # Relationships
     emergency_contacts = relationship("EmergencyContact", back_populates="user", cascade="all, delete-orphan")
     emergency_events = relationship("EmergencyEvent", back_populates="user")
+    sensor_readings = relationship("SensorReading", back_populates="user", cascade="all, delete-orphan")
