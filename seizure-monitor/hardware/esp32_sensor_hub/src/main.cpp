@@ -4,6 +4,7 @@
  * This firmware reads sensor data from:
  * - BME660/BME680: Temperature, Humidity, Gas Resistance (Menthone detection)
  * - MAX30102/MAX30105: Heart Rate, SpO2
+ * - EMG Sensor: Muscle activity monitoring
  *
  * And sends it to the backend API via HTTP POST
  */
@@ -41,6 +42,13 @@
 #define I2C_SDA 21
 #define I2C_SCL 22
 
+// EMG sensor pin (analog input)
+#define EMG_PIN 35  // GPIO 35 (ADC1_CH7)
+
+// EMG signal processing
+#define EMG_SAMPLES 50      // Number of samples for moving average
+#define EMG_THRESHOLD 100   // Baseline threshold for activity detection
+
 // Sensor objects
 Adafruit_BME680 bme;
 MAX30105 particleSensor;
@@ -53,12 +61,18 @@ const unsigned long WIFI_CHECK_INTERVAL = 30000; // Check WiFi every 30s
 // Device ID (MAC address)
 String deviceId;
 
+// EMG signal buffer for filtering
+int emgBuffer[EMG_SAMPLES];
+int emgBufferIndex = 0;
+bool emgBufferFilled = false;
+
 // Function declarations
 void setupWiFi();
 void setupSensors();
 bool readBME680(float &temp, float &humidity, float &gasResistance);
 bool readMAX30102(float &heartRate, float &spo2);
-void sendSensorData(float temp, float humidity, float gas, float hr, float spo2);
+float readEMG();
+void sendSensorData(float temp, float humidity, float gas, float hr, float spo2, float emg);
 float getBatteryLevel();
 
 void setup() {
@@ -80,6 +94,15 @@ void setup() {
 
   // Initialize I2C
   Wire.begin(I2C_SDA, I2C_SCL);
+
+  // Initialize EMG pin
+  pinMode(EMG_PIN, INPUT);
+  analogReadResolution(12);  // 12-bit ADC (0-4095)
+
+  // Initialize EMG buffer
+  for (int i = 0; i < EMG_SAMPLES; i++) {
+    emgBuffer[i] = 0;
+  }
 
   // Setup WiFi
   setupWiFi();
@@ -114,6 +137,7 @@ void loop() {
 
     bool bmeOk = readBME680(temperature, humidity, gasResistance);
     bool maxOk = readMAX30102(heartRate, spo2);
+    float emgValue = readEMG();
 
     // Send data to server if we have valid readings
     if (bmeOk || maxOk) {
@@ -122,7 +146,8 @@ void loop() {
         bmeOk ? humidity : -1,
         bmeOk ? gasResistance : -1,
         maxOk ? heartRate : -1,
-        maxOk ? spo2 : -1
+        maxOk ? spo2 : -1,
+        emgValue
       );
     } else {
       Serial.println("❌ No valid sensor readings");
@@ -225,7 +250,38 @@ bool readMAX30102(float &heartRate, float &spo2) {
   return true;
 }
 
-void sendSensorData(float temp, float humidity, float gas, float hr, float spo2) {
+float readEMG() {
+  // Read analog value from EMG sensor
+  int rawValue = analogRead(EMG_PIN);
+
+  // Add to circular buffer
+  emgBuffer[emgBufferIndex] = rawValue;
+  emgBufferIndex = (emgBufferIndex + 1) % EMG_SAMPLES;
+  if (!emgBufferFilled && emgBufferIndex == 0) {
+    emgBufferFilled = true;
+  }
+
+  // Calculate moving average
+  int sum = 0;
+  int count = emgBufferFilled ? EMG_SAMPLES : emgBufferIndex;
+  for (int i = 0; i < count; i++) {
+    sum += emgBuffer[i];
+  }
+  float average = (float)sum / count;
+
+  // Convert to normalized value (0-100 scale)
+  float normalized = (average / 4095.0) * 100.0;
+
+  // Detect activity (above threshold)
+  bool isActive = rawValue > EMG_THRESHOLD;
+
+  Serial.printf("   💪 EMG: %.1f%% (Raw: %d)%s\n",
+                normalized, rawValue, isActive ? " [ACTIVE]" : "");
+
+  return normalized;
+}
+
+void sendSensorData(float temp, float humidity, float gas, float hr, float spo2, float emg) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("   ⚠️  WiFi not connected, skipping upload");
     return;
@@ -244,6 +300,7 @@ void sendSensorData(float temp, float humidity, float gas, float hr, float spo2)
   }
   if (hr >= 0) doc["heart_rate"] = hr;
   if (spo2 >= 0) doc["spo2"] = spo2;
+  if (emg >= 0) doc["emg_signal"] = emg;
 
   doc["device_id"] = "ESP32_" + deviceId;
   doc["battery_level"] = getBatteryLevel();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -21,33 +21,10 @@ export const LiveMonitor: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [alertCountdown, setAlertCountdown] = useState(10);
 
-  // Mock data for seizure prediction - in real app this would come from your ML model/API
-  const [seizureRisk, setSeizureRisk] = useState<'low' | 'medium' | 'high'>('low');
-  const [timeToSeizure, setTimeToSeizure] = useState<number | undefined>(undefined);
-  const [aiConfidence, setAiConfidence] = useState(85);
-
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Cycle through risk levels for demo (equal probability)
-      const random = Math.random();
-      if (random < 0.33) {
-        setSeizureRisk('low');
-        setTimeToSeizure(undefined);
-        setAiConfidence(Math.floor(Math.random() * 20) + 75); // 75-95%
-      } else if (random < 0.66) {
-        setSeizureRisk('medium');
-        setTimeToSeizure(Math.floor(Math.random() * 60) + 60); // 60-120 minutes (1-2 hours)
-        setAiConfidence(Math.floor(Math.random() * 15) + 70); // 70-85%
-      } else {
-        setSeizureRisk('high');
-        setTimeToSeizure(Math.floor(Math.random() * 10) + 1); // 1-10 minutes
-        setAiConfidence(Math.floor(Math.random() * 10) + 80); // 80-90%
-      }
-    }, 3000); // Update every 3 seconds for demo
-
-    return () => clearInterval(interval);
-  }, []);
+  // Real seizure prediction data - defaults to low risk with no data
+  const seizureRisk: 'low' | 'medium' | 'high' = 'low';
+  const timeToSeizure: number | undefined = undefined;
+  const aiConfidence: number = 0;
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);

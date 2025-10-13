@@ -3,13 +3,13 @@ import { websocketService, SensorData, WebSocketMessage } from '../services/webs
 import { apiService } from '../services/api';
 import { useAuth } from './AuthContext';
 
-const MAX_DATA_POINTS = 60; // Store last 60 readings for graphs
+const MAX_DATA_POINTS = 30; // Store last 30 readings for graphs (30 minutes at 1 reading/min)
 
 interface SensorDataContextType {
   // Latest readings
   latestData: SensorData | null;
 
-  // Historical data for graphs (last 60 points)
+  // Historical data for graphs (last 30 points)
   heartRateData: number[];
   spo2Data: number[];
   temperatureData: number[];
@@ -98,11 +98,11 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
 
     setIsLoading(true);
     try {
-      // Fetch last hour of data to populate graphs
-      const history = await apiService.getSensorDataHistory(1);
+      // Fetch last 30 minutes of data to populate graphs
+      const history = await apiService.getSensorDataHistory(0.5);
 
       if (history.readings && history.readings.length > 0) {
-        // Get last 60 readings or all if less
+        // Get last 30 readings or all if less
         const readings = history.readings.slice(0, MAX_DATA_POINTS).reverse();
 
         // Extract data for each metric

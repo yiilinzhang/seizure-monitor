@@ -1,0 +1,82 @@
+============================================
+SEIZURE MONITOR - ARDUINO IDE QUICK START
+============================================
+
+📦 WHAT TO BUY:
+  □ ESP32 Dev Board (~$10-15)
+  □ BME680 sensor (~$15-25)
+  □ MAX30102 sensor (~$5-10)
+  □ Breadboard & wires (~$10)
+  Total: ~$40-60
+
+🔧 SOFTWARE SETUP:
+
+1. Install Arduino IDE
+   → https://www.arduino.cc/en/software
+
+2. Add ESP32 Board Support
+   → File → Preferences
+   → Add URL: https://dl.espressif.com/dl/package_esp32_index.json
+   → Tools → Board → Boards Manager
+   → Search "esp32" → Install
+
+3. Install Libraries (Sketch → Include Library → Manage Libraries)
+   □ Adafruit BME680 Library
+   □ SparkFun MAX3010x Sensor Library
+   □ ArduinoJson (version 7.x)
+   □ Adafruit Unified Sensor
+
+🔌 WIRING:
+
+BME680 → ESP32:
+  VCC → 3.3V
+  GND → GND
+  SCL → GPIO 22
+  SDA → GPIO 21
+
+MAX30102 → ESP32:
+  VIN → 3.3V
+  GND → GND
+  SCL → GPIO 22 (same)
+  SDA → GPIO 21 (same)
+
+💻 UPLOAD CODE:
+
+1. Open: hardware/esp32_sensor_hub_arduino/esp32_sensor_hub_arduino.ino
+
+2. Edit configuration in code:
+   - WIFI_SSID = "YourWiFiName"
+   - WIFI_PASSWORD = "YourPassword"
+   - API_URL = "http://YOUR_IP:8000"
+   - API_TOKEN = "get_from_backend"
+
+3. Select:
+   - Tools → Board → ESP32 Dev Module
+   - Tools → Port → (your ESP32 port)
+
+4. Click Upload button (→)
+
+5. Open Serial Monitor (Ctrl+Shift+M)
+   - Set baud: 115200
+
+✅ EXPECTED OUTPUT:
+
+✅ WiFi connected!
+✅ BME680: OK
+✅ MAX30102: OK
+✅ Data sent successfully!
+
+🆘 TROUBLESHOOTING:
+
+WiFi fails → Check SSID/password, use 2.4GHz WiFi
+Sensor not found → Check wiring, use 3.3V not 5V
+Upload fails → Install USB drivers, hold BOOT button
+HTTP 401 → Get new auth token from backend
+
+📚 FULL GUIDE: hardware/ARDUINO_SETUP.md
+
+🧪 TEST WITHOUT HARDWARE:
+   cd backend
+   python scripts/mock_sensor_sender.py --email test@example.com --password testpass123
+
+============================================

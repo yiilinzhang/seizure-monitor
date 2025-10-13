@@ -53,7 +53,7 @@ const tabConfigs: TabConfig[] = [
   {
     id: 'emg',
     title: 'EMG Level',
-    unit: 'μV',
+    unit: '%',
     color: '#FFB366',
     icon: 'zap',
     normalRange: '20-80',
@@ -71,10 +71,28 @@ export const HealthMetricsTabs: React.FC = () => {
     [activeTab]
   );
 
+  // Smoothing function - simple moving average
+  const smoothData = (rawData: number[], windowSize: number = 5): number[] => {
+    if (rawData.length < windowSize) return rawData;
+
+    const smoothed: number[] = [];
+    for (let i = 0; i < rawData.length; i++) {
+      const start = Math.max(0, i - Math.floor(windowSize / 2));
+      const end = Math.min(rawData.length, i + Math.ceil(windowSize / 2));
+      const window = rawData.slice(start, end);
+      const average = window.reduce((sum, val) => sum + val, 0) / window.length;
+      smoothed.push(average);
+    }
+    return smoothed;
+  };
+
   // Get data and current value for active tab
   const data = useMemo(() => {
     const dataArray = sensorData[activeTabConfig.dataKey] as number[];
-    return dataArray && dataArray.length > 0 ? dataArray : [0];
+    if (!dataArray || dataArray.length === 0) return [];
+
+    // Apply smoothing to reduce noise
+    return smoothData(dataArray, 5);
   }, [sensorData, activeTabConfig.dataKey]);
 
   const currentValue = useMemo(() => {
@@ -249,7 +267,7 @@ export const HealthMetricsTabs: React.FC = () => {
               backgroundColor: '#FFFFFF',
               backgroundGradientFrom: '#FFFFFF',
               backgroundGradientTo: '#FFFFFF',
-              decimalPlaces: 0,
+              decimalPlaces: 1,
               color: (opacity = 1) =>
                 activeTabConfig.color.replace(')', `, ${opacity})`).replace('rgb', 'rgba'),
               labelColor: (opacity = 1) => `rgba(138, 138, 138, ${opacity})`,
@@ -258,14 +276,19 @@ export const HealthMetricsTabs: React.FC = () => {
               },
               propsForDots: {
                 r: '0',
+                strokeWidth: 0,
               },
               propsForBackgroundLines: {
                 strokeDasharray: '5, 5',
                 stroke: '#F0F0F0',
                 strokeWidth: 1,
               },
+              fillShadowGradient: activeTabConfig.color,
+              fillShadowGradientOpacity: 0.15,
+              strokeWidth: 3,
             }}
             bezier
+            withShadow={false}
             style={{
               marginVertical: 8,
               borderRadius: 16,
@@ -304,10 +327,10 @@ export const HealthMetricsTabs: React.FC = () => {
           }}
         >
           <Text style={{ fontSize: 11, color: '#B0B0B0' }}>
-            60 min ago
+            30 min ago
           </Text>
           <Text style={{ fontSize: 11, color: '#B0B0B0' }}>
-            30 min ago
+            15 min ago
           </Text>
           <Text style={{ fontSize: 11, color: '#B0B0B0' }}>
             Now

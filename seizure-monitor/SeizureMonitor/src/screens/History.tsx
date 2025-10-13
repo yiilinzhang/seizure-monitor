@@ -10,49 +10,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 
-// Mock data for seizure events
-const mockEvents = [
-  {
-    id: 1,
-    time: '2:35 PM',
-    date: 'Today',
-    delta: '+38%',
-    duration: '45s',
-    fullDate: new Date(2025, 9, 16),
-  },
-  {
-    id: 2,
-    time: '10:15 AM',
-    date: 'Today',
-    delta: '+41%',
-    duration: '48s',
-    fullDate: new Date(2025, 9, 16),
-  },
-  {
-    id: 3,
-    time: '11:20 AM',
-    date: 'Sep 14',
-    delta: '+42%',
-    duration: '52s',
-    fullDate: new Date(2025, 8, 14),
-  },
-  {
-    id: 4,
-    time: '3:45 PM',
-    date: 'Sep 12',
-    delta: '+35%',
-    duration: '38s',
-    fullDate: new Date(2025, 8, 12),
-  },
-  {
-    id: 5,
-    time: '9:15 AM',
-    date: 'Sep 12',
-    delta: '+48%',
-    duration: '55s',
-    fullDate: new Date(2025, 8, 12),
-  },
-];
+// Real seizure events - empty array until real data is available
+const mockEvents: any[] = [];
 
 const monthNames = [
   'January', 'February', 'March', 'April', 'May', 'June',

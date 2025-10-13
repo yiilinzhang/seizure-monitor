@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Connect to FastAPI backend
-const API_URL = 'http://localhost:8000/api/v1'; // Update with your backend URL
+const API_URL = 'http://172.20.10.2:8000/api/v1'; // Mac backend on hotspot network
 
 interface AuthResponse {
   token: string;
