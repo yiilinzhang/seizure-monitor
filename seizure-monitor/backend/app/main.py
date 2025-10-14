@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
@@ -57,7 +57,9 @@ app.include_router(emergency.router, prefix="/api/v1", tags=["Emergency"])
 app.include_router(sensor_data.router, prefix="/api/v1", tags=["Sensor Data"])
 
 # WebSocket endpoint
-app.add_api_websocket_route("/ws", websocket_endpoint)
+@app.websocket("/ws")
+async def websocket_route(websocket: WebSocket):
+    await websocket_endpoint(websocket)
 
 
 # Health check endpoints

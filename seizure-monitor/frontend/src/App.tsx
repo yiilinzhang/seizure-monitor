@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConnectDevice } from './pages/ConnectDevice';
 import { LiveMonitor } from './pages/LiveMonitor';
+import { SensorControl } from './pages/SensorControl';
 import { History } from './pages/History';
 import { Emergency } from './pages/Emergency';
 import { Settings } from './pages/Settings';
@@ -37,9 +38,10 @@ export function App() {
     <BrowserRouter>
       <div className="bg-bg min-h-screen pb-20">
         <Routes>
-          <Route path="/" element={<Navigate to="/connect" replace />} />
+          <Route path="/" element={<Navigate to="/sensor-control" replace />} />
           <Route path="/connect" element={<ConnectDevice />} />
           <Route path="/live-monitor" element={<LiveMonitor />} />
+          <Route path="/sensor-control" element={<SensorControl />} />
           <Route path="/history" element={<History />} />
           <Route path="/emergency" element={<Emergency />} />
           <Route path="/settings" element={<Settings />} />

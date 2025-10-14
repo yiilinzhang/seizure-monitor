@@ -168,7 +168,7 @@ async def get_latest_sensor_reading(
 
 @router.get("/sensor-data/history", response_model=SensorDataHistory)
 async def get_sensor_reading_history(
-    hours: int = Query(default=24, ge=1, le=168, description="Hours of history to retrieve"),
+    hours: float = Query(default=24, ge=0.1, le=168, description="Hours of history to retrieve"),
     limit: int = Query(default=1000, ge=1, le=10000, description="Maximum number of readings"),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)

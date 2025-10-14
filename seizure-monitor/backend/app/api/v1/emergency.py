@@ -124,7 +124,7 @@ async def trigger_emergency(
         notifications=notification_results
     )
 
-@router.get("/events/{user_id}", response_model=dict)
+@router.get("/events/{user_id}")
 async def get_emergency_events(
     user_id: str,
     db: AsyncSession = Depends(get_session)
@@ -138,9 +138,22 @@ async def get_emergency_events(
     )
     events = result.scalars().all()
 
+    # Convert events to dict format
+    events_list = []
+    for event in events:
+        events_list.append({
+            "id": event.id,
+            "user_id": event.user_id,
+            "location_lat": event.location_lat,
+            "location_lng": event.location_lng,
+            "delta_pct": event.delta_pct,
+            "timestamp": event.timestamp,
+            "triggered_at": event.triggered_at.isoformat() if event.triggered_at else None
+        })
+
     return {
-        "events": events,
-        "count": len(events)
+        "events": events_list,
+        "count": len(events_list)
     }
 
 @router.get("/twiml/{user_name}")

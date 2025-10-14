@@ -1,17 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
+import { apiService } from '../services/api';
 
-// Real seizure events - empty array until real data is available
-const mockEvents: any[] = [];
+interface EmergencyEvent {
+  id: string;
+  user_id: string;
+  location_lat: number;
+  location_lng: number;
+  delta_pct: number;
+  timestamp: number;
+  triggered_at: string;
+}
 
 const monthNames = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -24,6 +33,27 @@ export const History: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [events, setEvents] = useState<EmergencyEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch emergency events on mount
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const user = await apiService.getUser();
+        if (user && user.id) {
+          const response = await apiService.getEmergencyEvents(user.id);
+          setEvents(response.events || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch emergency events:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -100,8 +130,8 @@ export const History: React.FC = () => {
   };
 
   const getEventCount = (day: number, month: number, year: number) => {
-    return mockEvents.filter(event => {
-      const eventDate = event.fullDate;
+    return events.filter(event => {
+      const eventDate = new Date(event.triggered_at);
       return (
         eventDate.getDate() === day &&
         eventDate.getMonth() === month &&
@@ -112,15 +142,15 @@ export const History: React.FC = () => {
 
   const filteredEvents = useMemo(() => {
     if (!selectedDate) return [];
-    return mockEvents.filter(event => {
-      const eventDate = event.fullDate;
+    return events.filter(event => {
+      const eventDate = new Date(event.triggered_at);
       return (
         eventDate.getDate() === selectedDate.getDate() &&
         eventDate.getMonth() === selectedDate.getMonth() &&
         eventDate.getFullYear() === selectedDate.getFullYear()
       );
     });
-  }, [selectedDate]);
+  }, [selectedDate, events]);
 
   const selectDay = (day: number, month: number, year: number) => {
     setSelectedDate(new Date(year, month, day));
@@ -146,230 +176,247 @@ export const History: React.FC = () => {
 
   return (
     <Layout title="History">
-      <View style={{ marginTop: 16 }}>
-        <Card>
-          {/* Calendar header */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 16,
-            }}
-          >
-            <Text
+      {loading ? (
+        <View style={{ marginTop: 100, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#87AEEE" />
+          <Text style={{ marginTop: 16, color: '#8A8A8A' }}>
+            Loading events...
+          </Text>
+        </View>
+      ) : (
+        <View style={{ marginTop: 16 }}>
+          <Card>
+            {/* Calendar header */}
+            <View
               style={{
-                fontSize: 18,
-                fontWeight: '600',
-                color: '#3D3D3D',
-              }}
-            >
-              {monthNames[currentMonth]} {currentYear}
-            </Text>
-            <View style={{ flexDirection: 'row' }}>
-              <TouchableOpacity
-                onPress={goToPreviousMonth}
-                style={{ padding: 8 }}
-              >
-                <Icon name="chevron-left" size={20} color="#8A8A8A" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={goToNextMonth}
-                style={{ padding: 8 }}
-              >
-                <Icon name="chevron-right" size={20} color="#8A8A8A" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Day headers */}
-          <View
-            style={{
-              flexDirection: 'row',
-              marginBottom: 8,
-            }}
-          >
-            {dayNames.map(day => (
-              <View
-                key={day}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: '#8A8A8A',
-                  }}
-                >
-                  {day}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Calendar grid */}
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-            }}
-          >
-            {calendarDays.map((dayObj, index) => {
-              const eventCount = getEventCount(
-                dayObj.day,
-                dayObj.month,
-                dayObj.year
-              );
-              const selected = isSelectedDay(
-                dayObj.day,
-                dayObj.month,
-                dayObj.year
-              );
-              const today = isToday(dayObj.day, dayObj.month, dayObj.year);
-
-              return (
-                <TouchableOpacity
-                  key={index}
-                  style={{
-                    width: '14.28%',
-                    aspectRatio: 1,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 2,
-                  }}
-                  onPress={() =>
-                    selectDay(dayObj.day, dayObj.month, dayObj.year)
-                  }
-                >
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: selected ? '#87AEEE' : 'transparent',
-                      borderWidth: today ? 1 : 0,
-                      borderColor: '#87AEEE',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: selected
-                          ? '#FFFFFF'
-                          : dayObj.isCurrentMonth
-                          ? '#3D3D3D'
-                          : '#8A8A8A',
-                        fontWeight: today ? '600' : '400',
-                      }}
-                    >
-                      {dayObj.day}
-                    </Text>
-                    {eventCount > 0 && (
-                      <View
-                        style={{
-                          position: 'absolute',
-                          bottom: 2,
-                          flexDirection: 'row',
-                        }}
-                      >
-                        {Array.from({ length: Math.min(eventCount, 3) }).map(
-                          (_, i) => (
-                            <View
-                              key={i}
-                              style={{
-                                width: 4,
-                                height: 4,
-                                borderRadius: 2,
-                                backgroundColor: '#FF8383',
-                                marginHorizontal: 1,
-                              }}
-                            />
-                          )
-                        )}
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </Card>
-
-        {/* Events for selected day */}
-        {selectedDate && (
-          <Card style={{ marginTop: 24 }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '600',
-                color: '#3D3D3D',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 marginBottom: 16,
               }}
             >
-              Events for{' '}
-              {selectedDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </Text>
-            {filteredEvents.length > 0 ? (
-              <View>
-                {filteredEvents.map(event => (
-                  <TouchableOpacity
-                    key={event.id}
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: '600',
+                  color: '#3D3D3D',
+                }}
+              >
+                {monthNames[currentMonth]} {currentYear}
+              </Text>
+              <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity
+                  onPress={goToPreviousMonth}
+                  style={{ padding: 8 }}
+                >
+                  <Icon name="chevron-left" size={20} color="#8A8A8A" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={goToNextMonth}
+                  style={{ padding: 8 }}
+                >
+                  <Icon name="chevron-right" size={20} color="#8A8A8A" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Day headers */}
+            <View
+              style={{
+                flexDirection: 'row',
+                marginBottom: 8,
+              }}
+            >
+              {dayNames.map(day => (
+                <View
+                  key={day}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingVertical: 12,
-                      borderBottomWidth: 1,
-                      borderBottomColor: 'rgba(138, 138, 138, 0.1)',
+                      fontSize: 12,
+                      color: '#8A8A8A',
                     }}
                   >
-                    <Icon name="clock" size={20} color="#8A8A8A" />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text
-                        style={{
-                          fontSize: 16,
-                          color: '#3D3D3D',
-                          fontWeight: '500',
-                        }}
-                      >
-                        {event.time} - {event.delta}
-                      </Text>
+                    {day}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Calendar grid */}
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+              }}
+            >
+              {calendarDays.map((dayObj, index) => {
+                const eventCount = getEventCount(
+                  dayObj.day,
+                  dayObj.month,
+                  dayObj.year
+                );
+                const selected = isSelectedDay(
+                  dayObj.day,
+                  dayObj.month,
+                  dayObj.year
+                );
+                const today = isToday(dayObj.day, dayObj.month, dayObj.year);
+
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={{
+                      width: '14.28%',
+                      aspectRatio: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 2,
+                    }}
+                    onPress={() =>
+                      selectDay(dayObj.day, dayObj.month, dayObj.year)
+                    }
+                  >
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: selected ? '#87AEEE' : 'transparent',
+                        borderWidth: today ? 1 : 0,
+                        borderColor: '#87AEEE',
+                      }}
+                    >
                       <Text
                         style={{
                           fontSize: 14,
-                          color: '#8A8A8A',
-                          marginTop: 4,
+                          color: selected
+                            ? '#FFFFFF'
+                            : dayObj.isCurrentMonth
+                            ? '#3D3D3D'
+                            : '#8A8A8A',
+                          fontWeight: today ? '600' : '400',
                         }}
                       >
-                        Duration: {event.duration}
+                        {dayObj.day}
                       </Text>
+                      {eventCount > 0 && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            bottom: 2,
+                            flexDirection: 'row',
+                          }}
+                        >
+                          {Array.from({ length: Math.min(eventCount, 3) }).map(
+                            (_, i) => (
+                              <View
+                                key={i}
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: 3,
+                                  backgroundColor: '#FF4444',
+                                  marginHorizontal: 1,
+                                }}
+                              />
+                            )
+                          )}
+                        </View>
+                      )}
                     </View>
-                    <Icon name="chevron-right" size={20} color="#8A8A8A" />
                   </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
+                );
+              })}
+            </View>
+          </Card>
+
+          {/* Events for selected day */}
+          {selectedDate && (
+            <Card style={{ marginTop: 24 }}>
               <Text
                 style={{
-                  textAlign: 'center',
-                  fontSize: 14,
-                  color: '#8A8A8A',
-                  paddingVertical: 24,
+                  fontSize: 18,
+                  fontWeight: '600',
+                  color: '#3D3D3D',
+                  marginBottom: 16,
                 }}
               >
-                No events on this day
+                Events for{' '}
+                {selectedDate.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
               </Text>
-            )}
-          </Card>
-        )}
-      </View>
+              {filteredEvents.length > 0 ? (
+                <View>
+                  {filteredEvents.map(event => {
+                    const eventDate = new Date(event.triggered_at);
+                    const timeStr = eventDate.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+
+                    return (
+                      <TouchableOpacity
+                        key={event.id}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: 'rgba(138, 138, 138, 0.1)',
+                        }}
+                      >
+                        <Icon name="alert-circle" size={20} color="#FF8383" />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text
+                            style={{
+                              fontSize: 16,
+                              color: '#3D3D3D',
+                              fontWeight: '500',
+                            }}
+                          >
+                            {timeStr} - Seizure Event
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              color: '#8A8A8A',
+                              marginTop: 4,
+                            }}
+                          >
+                            Menthone spike: {event.delta_pct.toFixed(1)}%
+                          </Text>
+                        </View>
+                        <Icon name="chevron-right" size={20} color="#8A8A8A" />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 14,
+                    color: '#8A8A8A',
+                    paddingVertical: 24,
+                  }}
+                >
+                  No events on this day
+                </Text>
+              )}
+            </Card>
+          )}
+        </View>
+      )}
     </Layout>
   );
 };

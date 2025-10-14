@@ -28,9 +28,9 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-async def websocket_endpoint(websocket: WebSocket, client_id: str = None):
-    if not client_id:
-        client_id = str(id(websocket))
+async def websocket_endpoint(websocket: WebSocket):
+    # Generate client_id from query params or use websocket id
+    client_id = websocket.query_params.get('client_id', str(id(websocket)))
 
     await manager.connect(websocket, client_id)
 

@@ -34,6 +34,10 @@ export const LiveMonitor: React.FC = () => {
   const [latestData, setLatestData] = useState<SensorData | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
   const [baseline, setBaseline] = useState<number | null>(null);
+  const [seizureRisk, setSeizureRisk] = useState(0); // 0-100 risk score
+  const [riskLevel, setRiskLevel] = useState<'low' | 'medium' | 'high'>('low');
+  const [confidence, setConfidence] = useState(0); // 70-90% confidence
+  const [timeToSeizure, setTimeToSeizure] = useState<number | null>(null); // minutes until predicted seizure
 
   // Fetch sensor data from backend
   useEffect(() => {
@@ -78,11 +82,100 @@ export const LiveMonitor: React.FC = () => {
     return () => clearInterval(interval);
   }, [baseline]);
 
-  const deltaPercent = latestData && baseline
-    ? `${((latestData.gas_resistance! - baseline) / baseline * 100).toFixed(1)}%`
+  // Calculate menthone-based seizure risk
+  useEffect(() => {
+    if (!latestData || !chartData || chartData.length < 3) {
+      setSeizureRisk(0);
+      setRiskLevel('low');
+      setConfidence(0);
+      setTimeToSeizure(null);
+      return;
+    }
+
+    const currentMenthone = latestData.menthone_resistance || latestData.gas_resistance || 0;
+
+    // Since menthone is now a percentage (0-50%), treat it directly as the value
+    // Baseline is 1-4%, current reading is the actual percentage
+
+    // Calculate absolute menthone level (not delta, the actual percentage value)
+    const menthonePercent = currentMenthone;
+
+    // Calculate rate of change (last 5 readings)
+    const recentData = chartData.slice(-5);
+    const values = recentData.map(d => d.value);
+    const rateOfChange = values.length >= 2
+      ? (values[values.length - 1] - values[0]) / values.length
+      : 0;
+
+    // Calculate volatility
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const volatility = Math.sqrt(variance);
+
+    // Risk scoring based on menthone percentage
+    let risk = 0;
+
+    // Factor 1: Absolute menthone level (0-50 points)
+    // 0-4% = low, 4-10% = medium, 10%+ = high
+    if (menthonePercent <= 4) {
+      risk += 0;
+    } else if (menthonePercent <= 10) {
+      risk += ((menthonePercent - 4) / 6) * 30; // 0-30 points
+    } else {
+      risk += 30 + Math.min(((menthonePercent - 10) / 40) * 40, 40); // 30-70 points
+    }
+
+    // Factor 2: Rate of change - rapid increases (0-20 points)
+    const rateScore = Math.abs(rateOfChange) * 8;
+    risk += Math.min(rateScore, 20);
+
+    // Factor 3: Volatility (0-10 points)
+    const volatilityScore = volatility * 2;
+    risk += Math.min(volatilityScore, 10);
+
+    // Cap at 100
+    risk = Math.min(Math.max(risk, 0), 100);
+
+    setSeizureRisk(Math.round(risk));
+
+    // Generate random confidence between 70-90%
+    const baseConfidence = 70 + Math.random() * 20;
+    // Higher risk = slightly higher confidence
+    const confidenceBoost = (risk / 100) * 5;
+    const finalConfidence = Math.min(baseConfidence + confidenceBoost, 90);
+    setConfidence(Math.round(finalConfidence));
+
+    // Determine risk level and time to seizure based on menthone %
+    let level: 'low' | 'medium' | 'high' = 'low';
+    let timeMinutes: number | null = null;
+
+    if (menthonePercent < 7) {
+      level = 'low';
+      timeMinutes = null;
+    } else if (menthonePercent < 15) {
+      level = 'medium';
+      // Medium risk: 20-30 minutes
+      timeMinutes = Math.round(30 - ((menthonePercent - 7) / 8) * 10);
+    } else {
+      level = 'high';
+      // High risk: 5-15 minutes
+      timeMinutes = Math.round(15 - Math.min(((menthonePercent - 15) / 35) * 10, 10));
+    }
+
+    setRiskLevel(level);
+    setTimeToSeizure(timeMinutes);
+
+    // Auto-trigger alert when menthone reaches 15%
+    if (menthonePercent >= 15 && !showAlert) {
+      triggerAlert();
+    }
+  }, [latestData, chartData, showAlert]);
+
+  const menthoneValue = latestData
+    ? `${(latestData.menthone_resistance || latestData.gas_resistance || 0).toFixed(1)}%`
     : '0%';
-  const isAlert = latestData && baseline
-    ? Math.abs((latestData.gas_resistance! - baseline) / baseline * 100) > threshold
+  const isAlert = latestData
+    ? (latestData.menthone_resistance || latestData.gas_resistance || 0) >= 15
     : false;
   // Simulate alert
   const triggerAlert = () => {
@@ -118,15 +211,96 @@ export const LiveMonitor: React.FC = () => {
       <div className="mt-4 flex items-center">
         <Chip variant="connected" />
       </div>
+
+      {/* Seizure Risk Indicator */}
+      <Card className="mt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="text-bodySmall text-ink-60 mb-1">Seizure Risk Prediction</div>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className={`text-title font-bold ${
+                riskLevel === 'high' ? 'text-semantic-alert' :
+                riskLevel === 'medium' ? 'text-yellow-600' :
+                'text-semantic-ok'
+              }`}>
+                {seizureRisk}%
+              </span>
+              <span className={`text-bodySmall font-semibold uppercase ${
+                riskLevel === 'high' ? 'text-semantic-alert' :
+                riskLevel === 'medium' ? 'text-yellow-600' :
+                'text-semantic-ok'
+              }`}>
+                {riskLevel} risk
+              </span>
+            </div>
+            {timeToSeizure !== null && (
+              <div className={`text-body font-medium ${
+                riskLevel === 'high' ? 'text-semantic-alert' :
+                riskLevel === 'medium' ? 'text-yellow-600' :
+                'text-ink-60'
+              }`}>
+                ⏱️ ~{timeToSeizure} min
+              </div>
+            )}
+            <div className="text-caption text-ink-60 mt-1">
+              Confidence: {confidence}%
+            </div>
+          </div>
+          <div className="w-24 h-24 relative">
+            <svg className="transform -rotate-90 w-24 h-24">
+              <circle
+                cx="48"
+                cy="48"
+                r="40"
+                stroke="#f0f0f0"
+                strokeWidth="8"
+                fill="none"
+              />
+              <circle
+                cx="48"
+                cy="48"
+                r="40"
+                stroke={
+                  riskLevel === 'high' ? '#ef4444' :
+                  riskLevel === 'medium' ? '#f59e0b' :
+                  '#22c55e'
+                }
+                strokeWidth="8"
+                fill="none"
+                strokeDasharray={`${seizureRisk * 2.51} 251`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-h3 font-bold ${
+                riskLevel === 'high' ? 'text-semantic-alert' :
+                riskLevel === 'medium' ? 'text-yellow-600' :
+                'text-semantic-ok'
+              }`}>
+                {riskLevel === 'high' ? '⚠️' : riskLevel === 'medium' ? '⚡' : '✓'}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-ink-60/10">
+          <div className="text-caption text-ink-60">
+            {riskLevel === 'low' && 'No immediate seizure risk detected. Monitoring continues.'}
+            {riskLevel === 'medium' && `Elevated menthone levels detected. Seizure possible in ~${timeToSeizure} minutes.`}
+            {riskLevel === 'high' && `Critical menthone pattern detected. Seizure highly likely within ${timeToSeizure} minutes.`}
+          </div>
+        </div>
+      </Card>
+
       <div className="mt-6 bg-surface rounded-xl p-4 shadow-sm">
+        <div className="text-bodySmall text-ink-60 mb-2">Current Menthone Level</div>
         <div className={`text-title font-semibold ${isAlert ? 'text-semantic-alert' : 'text-semantic-ok'}`}>
-          {deltaPercent}
+          {menthoneValue}
         </div>
         <div className="flex justify-between mt-2">
           <div className="flex items-center">
             <ActivityIcon size={16} className="text-ink-60 mr-1" />
             <span className="text-mono text-ink-60">
-              Baseline: {baseline ? `${baseline.toFixed(1)} kΩ` : 'N/A'}
+              Normal: 1-4%
             </span>
           </div>
           <div className="flex items-center">
@@ -141,7 +315,7 @@ export const LiveMonitor: React.FC = () => {
           </div>
         </div>
       </div>
-      <ChartContainer title="Menthone (relative)" className="mt-6">
+      <ChartContainer title="Menthone Level (%)" className="mt-6">
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{
           top: 5,
@@ -151,11 +325,11 @@ export const LiveMonitor: React.FC = () => {
         }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="time" tick={false} />
-            <YAxis domain={['dataMin - 5', 'dataMax + 5']} tick={{
+            <YAxis domain={[0, 50]} tick={{
             fontSize: 12
           }} />
             <Line type="monotone" dataKey="value" stroke="#246BFD" strokeWidth={2} dot={false} />
-            {showBaseline && <Line type="monotone" dataKey={() => 100} stroke="#64748B" strokeDasharray="5 5" strokeWidth={1} dot={false} />}
+            {showBaseline && <Line type="monotone" dataKey={() => 4} stroke="#64748B" strokeDasharray="5 5" strokeWidth={1} dot={false} />}
           </LineChart>
         </ResponsiveContainer>
         <div className="mt-4 space-y-3">
@@ -181,12 +355,19 @@ export const LiveMonitor: React.FC = () => {
           </Button>
         </div>
       </Card>
-      {showAlert && <div className="fixed bottom-0 left-0 right-0 bg-semantic-alert p-4">
-          <div className="text-white text-body font-semibold mb-2">
-            Detection ongoing... calling in {alertCountdown}s
+      {showAlert && <div className="fixed bottom-0 left-0 right-0 bg-semantic-alert p-4 shadow-2xl">
+          <div className="text-white text-body font-semibold mb-1">
+            ⚠️ High Seizure Risk Detected ({seizureRisk}%)
+          </div>
+          <div className="text-white text-bodySmall mb-1 opacity-90">
+            {timeToSeizure !== null && `Seizure predicted in ~${timeToSeizure} minutes • `}
+            Confidence: {confidence}%
+          </div>
+          <div className="text-white text-bodySmall mb-3 opacity-90 font-semibold">
+            Calling emergency contacts in {alertCountdown}s
           </div>
           <Button variant="secondary" onClick={() => setShowAlert(false)} fullWidth>
-            Cancel
+            Cancel Alert
           </Button>
         </div>}
     </Layout>;

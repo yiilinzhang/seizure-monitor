@@ -72,17 +72,40 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
 
   // Handle incoming sensor data
   const handleSensorUpdate = useCallback((data: SensorData) => {
+    console.log('📊 UPDATING GRAPHS with:', {
+      hr: data.heart_rate,
+      spo2: data.spo2,
+      menthone: data.menthone_resistance,
+      emg: data.emg_level
+    });
+
     setLatestData(data);
     setLastUpdate(new Date());
 
     // Update historical data arrays
-    setHeartRateData((prev) => addDataPoint(prev, data.heart_rate));
-    setSpo2Data((prev) => addDataPoint(prev, data.spo2));
+    setHeartRateData((prev) => {
+      const newData = addDataPoint(prev, data.heart_rate);
+      console.log(`  HR data points: ${newData.length}, latest: ${data.heart_rate}`);
+      return newData;
+    });
+    setSpo2Data((prev) => {
+      const newData = addDataPoint(prev, data.spo2);
+      console.log(`  SpO2 data points: ${newData.length}, latest: ${data.spo2}`);
+      return newData;
+    });
     setTemperatureData((prev) => addDataPoint(prev, data.temperature));
     setHumidityData((prev) => addDataPoint(prev, data.humidity));
     setGasResistanceData((prev) => addDataPoint(prev, data.gas_resistance));
-    setMenthoneData((prev) => addDataPoint(prev, data.menthone_resistance));
-    setEmgData((prev) => addDataPoint(prev, data.emg_level));
+    setMenthoneData((prev) => {
+      const newData = addDataPoint(prev, data.menthone_resistance);
+      console.log(`  Menthone data points: ${newData.length}, latest: ${data.menthone_resistance}`);
+      return newData;
+    });
+    setEmgData((prev) => {
+      const newData = addDataPoint(prev, data.emg_level);
+      console.log(`  EMG data points: ${newData.length}, latest: ${data.emg_level}`);
+      return newData;
+    });
   }, []);
 
   // WebSocket message handler
@@ -92,8 +115,56 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
     }
   }, [handleSensorUpdate]);
 
-  // Fetch initial historical data
+  // Fetch latest reading and add to graph
   const refreshData = useCallback(async () => {
+    if (!isAuthenticated) {
+      console.log('❌ NOT AUTHENTICATED - Cannot fetch data');
+      return;
+    }
+
+    console.log('🔄 FETCHING SENSOR DATA...');
+    setIsLoading(true);
+    try {
+      // Get the absolute latest reading (always update this)
+      const latest = await apiService.getLatestSensorData();
+      console.log('✅ Latest data received:', JSON.stringify(latest));
+
+      if (latest && latest.timestamp) {
+        // Check if data is fresh (within last 2 minutes to be more lenient)
+        const now = Date.now();
+        // Parse timestamp as UTC (add 'Z' if not present)
+        const timestampStr = latest.timestamp.endsWith('Z') ? latest.timestamp : latest.timestamp + 'Z';
+        const dataTimestamp = new Date(timestampStr).getTime();
+        const dataAge = now - dataTimestamp;
+        const isDataFresh = dataAge < 120000; // 2 minutes (very lenient for testing)
+
+        console.log(`⏰ Now: ${new Date(now).toISOString()}, Data: ${new Date(dataTimestamp).toISOString()}`);
+        console.log(`Data age: ${dataAge}ms (${(dataAge / 1000).toFixed(1)}s), fresh: ${isDataFresh}`);
+        console.log('Latest data:', JSON.stringify(latest));
+
+        if (isDataFresh) {
+          // Update latest data and add to historical arrays
+          console.log('Updating with fresh data');
+          handleSensorUpdate(latest);
+        } else {
+          // Data is stale, clear everything
+          console.log('Data is stale (older than 2 minutes), clearing...');
+          clearData();
+        }
+      } else {
+        // No data at all
+        console.log('No data received from API, clearing...');
+        clearData();
+      }
+    } catch (error) {
+      console.error('Failed to refresh sensor data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, handleSensorUpdate, clearData]);
+
+  // Fetch initial historical data on mount only
+  const loadInitialData = useCallback(async () => {
     if (!isAuthenticated) return;
 
     setIsLoading(true);
@@ -102,6 +173,25 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
       const history = await apiService.getSensorDataHistory(0.5);
 
       if (history.readings && history.readings.length > 0) {
+        // Check if the most recent data is fresh (within last 2 minutes)
+        const latestReading = history.readings[0];
+        // Parse timestamp as UTC (add 'Z' if not present)
+        const timestampStr = latestReading.timestamp.endsWith('Z') ? latestReading.timestamp : latestReading.timestamp + 'Z';
+        const dataAge = Date.now() - new Date(timestampStr).getTime();
+        const isDataFresh = dataAge < 120000; // 2 minutes
+
+        console.log(`Historical data age: ${dataAge}ms (${(dataAge / 1000).toFixed(1)}s)`);
+
+        if (!isDataFresh) {
+          // Data is too old, don't load it
+          console.log('Historical data is stale (older than 2 min), not loading');
+          clearData();
+          setIsLoading(false);
+          return;
+        }
+
+        console.log(`Loading ${history.readings.length} historical readings`);
+
         // Get last 30 readings or all if less
         const readings = history.readings.slice(0, MAX_DATA_POINTS).reverse();
 
@@ -127,20 +217,16 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
           setLatestData(readings[readings.length - 1]);
           setLastUpdate(new Date());
         }
-      }
-
-      // Also get the absolute latest reading
-      const latest = await apiService.getLatestSensorData();
-      if (latest && latest.timestamp) {
-        setLatestData(latest);
-        setLastUpdate(new Date());
+      } else {
+        // No data available
+        clearData();
       }
     } catch (error) {
-      console.error('Failed to refresh sensor data:', error);
+      console.error('Failed to load initial data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, clearData]);
 
   // Clear all data
   const clearData = useCallback(() => {
@@ -158,23 +244,30 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
   // Connect to WebSocket when authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      websocketService.connect();
-      refreshData(); // Fetch initial data
+      // DISABLED: WebSocket has issues, using polling only
+      // websocketService.connect();
+      loadInitialData(); // Load historical data once
 
       // Update connection status
       const checkInterval = setInterval(() => {
         setIsConnected(websocketService.isConnected());
       }, 1000);
 
+      // Auto-refresh latest reading every 4 seconds (primary method)
+      const refreshInterval = setInterval(() => {
+        refreshData();
+      }, 4000);
+
       return () => {
         clearInterval(checkInterval);
+        clearInterval(refreshInterval);
       };
     } else {
       websocketService.disconnect();
       clearData();
       setIsConnected(false);
     }
-  }, [isAuthenticated, refreshData, clearData]);
+  }, [isAuthenticated, loadInitialData, refreshData, clearData]);
 
   // Subscribe to WebSocket messages
   useEffect(() => {

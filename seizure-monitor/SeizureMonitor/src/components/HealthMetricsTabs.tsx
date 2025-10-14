@@ -5,9 +5,8 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
+import { SimpleLineChart } from './SimpleLineChart';
 import { Card } from './Card';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSensorData } from '../contexts/SensorDataContext';
@@ -20,17 +19,21 @@ interface TabConfig {
   icon: string;
   normalRange: string;
   dataKey: keyof ReturnType<typeof useSensorData>;
+  yMin: number;
+  yMax: number;
 }
 
 const tabConfigs: TabConfig[] = [
   {
     id: 'menthone',
     title: 'Menthone',
-    unit: 'kΩ',
+    unit: '%',
     color: '#87AEEE',
     icon: 'activity',
-    normalRange: '80-120',
+    normalRange: '1-4',
     dataKey: 'menthoneData',
+    yMin: 0,
+    yMax: 20,
   },
   {
     id: 'heartrate',
@@ -40,6 +43,8 @@ const tabConfigs: TabConfig[] = [
     icon: 'heart',
     normalRange: '60-100',
     dataKey: 'heartRateData',
+    yMin: 60,
+    yMax: 100,
   },
   {
     id: 'spo2',
@@ -47,8 +52,10 @@ const tabConfigs: TabConfig[] = [
     unit: '%',
     color: '#83D49B',
     icon: 'droplet',
-    normalRange: '95-100',
+    normalRange: '80-100',
     dataKey: 'spo2Data',
+    yMin: 80,
+    yMax: 100,
   },
   {
     id: 'emg',
@@ -56,8 +63,10 @@ const tabConfigs: TabConfig[] = [
     unit: '%',
     color: '#FFB366',
     icon: 'zap',
-    normalRange: '20-80',
+    normalRange: '0-100',
     dataKey: 'emgData',
+    yMin: 0,
+    yMax: 100,
   },
 ];
 
@@ -95,8 +104,13 @@ export const HealthMetricsTabs: React.FC = () => {
     return smoothData(dataArray, 5);
   }, [sensorData, activeTabConfig.dataKey]);
 
+  // Just use actual data - custom chart handles fixed scale
+  const chartData = useMemo(() => {
+    return data;
+  }, [data]);
+
   const currentValue = useMemo(() => {
-    if (data.length > 1 && data[data.length - 1] !== 0) {
+    if (data.length > 0 && data[data.length - 1] !== 0) {
       return data[data.length - 1];
     }
     // Fallback to latest data from sensor
@@ -197,106 +211,35 @@ export const HealthMetricsTabs: React.FC = () => {
               gap: 4,
             }}
           >
-            {sensorData.isLoading ? (
-              <ActivityIndicator size="small" color={activeTabConfig.color} />
-            ) : (
-              <>
-                <Text
-                  style={{
-                    fontSize: 24,
-                    fontWeight: '700',
-                    color: activeTabConfig.color,
-                  }}
-                >
-                  {currentValue ? Math.round(currentValue * 10) / 10 : '--'}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: '#8A8A8A',
-                  }}
-                >
-                  {activeTabConfig.unit}
-                </Text>
-              </>
-            )}
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: '700',
+                color: activeTabConfig.color,
+              }}
+            >
+              {currentValue ? Math.round(currentValue * 10) / 10 : '--'}
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: '#8A8A8A',
+              }}
+            >
+              {activeTabConfig.unit}
+            </Text>
           </View>
-        </View>
-
-        {/* Normal Range Indicator */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 16,
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            backgroundColor: '#F5F5F5',
-            borderRadius: 12,
-          }}
-        >
-          <Icon name="info" size={14} color="#8A8A8A" />
-          <Text
-            style={{
-              fontSize: 12,
-              color: '#8A8A8A',
-              marginLeft: 6,
-            }}
-          >
-            Normal range: {activeTabConfig.normalRange} {activeTabConfig.unit}
-          </Text>
         </View>
 
         {/* Chart */}
         {data.length > 0 ? (
-          <LineChart
-            data={{
-              labels: [],
-              datasets: [
-                {
-                  data: data,
-                },
-              ],
-            }}
+          <SimpleLineChart
+            data={chartData}
             width={screenWidth - 64}
             height={200}
-            yAxisLabel=""
-            yAxisSuffix=""
-            yAxisInterval={1}
-            chartConfig={{
-              backgroundColor: '#FFFFFF',
-              backgroundGradientFrom: '#FFFFFF',
-              backgroundGradientTo: '#FFFFFF',
-              decimalPlaces: 1,
-              color: (opacity = 1) =>
-                activeTabConfig.color.replace(')', `, ${opacity})`).replace('rgb', 'rgba'),
-              labelColor: (opacity = 1) => `rgba(138, 138, 138, ${opacity})`,
-              style: {
-                borderRadius: 16,
-              },
-              propsForDots: {
-                r: '0',
-                strokeWidth: 0,
-              },
-              propsForBackgroundLines: {
-                strokeDasharray: '5, 5',
-                stroke: '#F0F0F0',
-                strokeWidth: 1,
-              },
-              fillShadowGradient: activeTabConfig.color,
-              fillShadowGradientOpacity: 0.15,
-              strokeWidth: 3,
-            }}
-            bezier
-            withShadow={false}
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-            }}
-            withInnerLines={true}
-            withOuterLines={false}
-            withHorizontalLabels={true}
-            withVerticalLabels={false}
+            yMin={activeTabConfig.yMin}
+            yMax={activeTabConfig.yMax}
+            color={activeTabConfig.color}
           />
         ) : (
           <View

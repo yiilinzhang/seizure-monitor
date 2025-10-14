@@ -252,12 +252,19 @@ class ApiService {
   async getLatestSensorData(): Promise<any> {
     await this.loadToken();
 
+    console.log('[API] Fetching latest sensor data from:', `${API_URL}/sensor-data/latest`);
+    console.log('[API] Token:', this.token ? `${this.token.substring(0, 20)}...` : 'NO TOKEN');
+
     const response = await fetch(`${API_URL}/sensor-data/latest`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
 
+    console.log('[API] Response status:', response.status);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[API] Error response:', errorText);
       if (response.status === 401) {
         await this.logout();
         throw new Error('Session expired. Please login again.');
@@ -265,7 +272,9 @@ class ApiService {
       throw new Error('Failed to fetch sensor data');
     }
 
-    return response.json();
+    const data = await response.json();
+    console.log('[API] Latest sensor data received:', JSON.stringify(data).substring(0, 200));
+    return data;
   }
 
   async getSensorDataHistory(hours: number = 24): Promise<any> {
@@ -301,6 +310,26 @@ class ApiService {
         throw new Error('Session expired. Please login again.');
       }
       throw new Error('Failed to fetch sensor stats');
+    }
+
+    return response.json();
+  }
+
+  // Emergency events methods
+  async getEmergencyEvents(userId: string): Promise<any> {
+    await this.loadToken();
+
+    const response = await fetch(`${API_URL}/events/${userId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        await this.logout();
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error('Failed to fetch emergency events');
     }
 
     return response.json();

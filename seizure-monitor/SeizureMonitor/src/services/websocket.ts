@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const WS_URL = 'ws://172.20.10.2:8000/ws'; // Mac backend on hotspot network
+const WS_URL = 'ws://localhost:8000/ws'; // Mac backend (use localhost for iOS simulator)
 
 export type SensorData = {
   id: string;
