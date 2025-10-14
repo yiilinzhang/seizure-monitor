@@ -17,6 +17,7 @@ import { Button } from '../components/Button';
 import { SeizurePrediction } from '../components/SeizurePrediction';
 import { HealthMetricsTabs } from '../components/HealthMetricsTabs';
 import { useSensorData } from '../contexts/SensorDataContext';
+import { apiService } from '../services/api';
 
 export const LiveMonitor: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
@@ -24,6 +25,8 @@ export const LiveMonitor: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [alertCountdown, setAlertCountdown] = useState(10);
   const [showBigPopup, setShowBigPopup] = useState(false);
+  const [highRiskStartTime, setHighRiskStartTime] = useState<number | null>(null);
+  const [autoAlertTriggered, setAutoAlertTriggered] = useState(false);
   const sensorData = useSensorData();
 
   // Calculate seizure prediction based on menthone level
@@ -55,6 +58,83 @@ export const LiveMonitor: React.FC = () => {
     }
   }, [sensorData.latestData?.menthone_resistance]);
 
+  // Monitor high risk duration and auto-trigger alert after 5 seconds
+  React.useEffect(() => {
+    // Reset tracking when risk changes
+    if (seizureRisk === 'high') {
+      if (highRiskStartTime === null && !autoAlertTriggered) {
+        console.log('⚠️ HIGH RISK detected - starting 5 second timer');
+        setHighRiskStartTime(Date.now());
+      }
+    } else {
+      // Reset when risk drops below high
+      if (highRiskStartTime !== null) {
+        console.log('✅ Risk dropped below HIGH - resetting timer');
+        setHighRiskStartTime(null);
+        setAutoAlertTriggered(false);
+      }
+    }
+  }, [seizureRisk]);
+
+  // Separate effect to continuously check elapsed time
+  React.useEffect(() => {
+    if (seizureRisk === 'high' && highRiskStartTime !== null && !autoAlertTriggered) {
+      const checkInterval = setInterval(() => {
+        const elapsed = Date.now() - highRiskStartTime;
+        console.log(`⏱️ HIGH RISK elapsed: ${(elapsed / 1000).toFixed(1)}s / 5s`);
+
+        if (elapsed >= 5000) {
+          console.log('🚨 HIGH RISK for 5+ seconds - AUTO-TRIGGERING EMERGENCY ALERT');
+          setAutoAlertTriggered(true);
+
+          // Show big popup immediately
+          setShowBigPopup(true);
+
+          // Trigger actual emergency call via backend
+          (async () => {
+            try {
+              console.log('📞 Calling backend to trigger emergency phone calls...');
+              const user = await apiService.getUser();
+              const menthoneLevel = sensorData.latestData?.menthone_resistance || 0;
+
+              // Generate a unique event ID
+              const eventId = `emergency-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+              const payload = {
+                userId: user.id,
+                eventId: eventId,
+                location: {
+                  lat: 37.7749, // Default location (San Francisco) - could be replaced with GPS
+                  lng: -122.4194
+                },
+                delta_pct: menthoneLevel,
+                timestamp: Math.floor(Date.now() / 1000),
+                sendSMS: false, // TESTING MODE - disabled to avoid spam
+                sendCall: false // TESTING MODE - disabled to avoid spam calls
+              };
+
+              console.log('Emergency payload:', JSON.stringify(payload));
+
+              const response = await apiService.triggerEmergency(payload);
+              console.log('✅ Emergency contacts notified!', response);
+            } catch (error) {
+              console.error('❌ Failed to trigger emergency:', error);
+              Alert.alert('Error', 'Failed to notify emergency contacts. Please call manually.');
+            }
+          })();
+
+          // Auto-close after 3 seconds
+          setTimeout(() => {
+            setShowBigPopup(false);
+            Alert.alert('Emergency', 'Emergency contacts have been notified');
+          }, 3000);
+        }
+      }, 500); // Check every 500ms
+
+      return () => clearInterval(checkInterval);
+    }
+  }, [seizureRisk, highRiskStartTime, autoAlertTriggered, sensorData.latestData?.menthone_resistance]);
+
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     // Simulate fetching new data
@@ -79,9 +159,40 @@ export const LiveMonitor: React.FC = () => {
     }, 1000);
   };
 
-  const handleManualEvent = () => {
+  const handleManualEvent = async () => {
     // Show big popup immediately
     setShowBigPopup(true);
+
+    // Trigger actual emergency call via backend
+    try {
+      console.log('📞 Manual trigger - calling backend to trigger emergency phone calls...');
+      const user = await apiService.getUser();
+      const menthoneLevel = sensorData.latestData?.menthone_resistance || 0;
+
+      // Generate a unique event ID
+      const eventId = `manual-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      const payload = {
+        userId: user.id,
+        eventId: eventId,
+        location: {
+          lat: 37.7749, // Default location (San Francisco) - could be replaced with GPS
+          lng: -122.4194
+        },
+        delta_pct: menthoneLevel,
+        timestamp: Math.floor(Date.now() / 1000),
+        sendSMS: true,
+        sendCall: true
+      };
+
+      console.log('Manual emergency payload:', JSON.stringify(payload));
+
+      const response = await apiService.triggerEmergency(payload);
+      console.log('✅ Manual emergency - contacts notified!', response);
+    } catch (error) {
+      console.error('❌ Failed to trigger manual emergency:', error);
+      Alert.alert('Error', 'Failed to notify emergency contacts. Please call manually.');
+    }
 
     // Auto-close after 3 seconds
     setTimeout(() => {

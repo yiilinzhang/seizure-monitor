@@ -52,7 +52,7 @@ export const SensorControl: React.FC = () => {
     return current < target ? current + step : current - step;
   };
 
-  const sendSensorData = async (hrValue: number, spo2Value: number, emgPercentage: number, menthoneValue: number) => {
+  const sendSensorData = async (hrValue: number | null, spo2Value: number | null, emgPercentage: number | null, menthoneValue: number | null) => {
     try {
       const token = localStorage.getItem('authToken');
 
@@ -62,21 +62,22 @@ export const SensorControl: React.FC = () => {
         return;
       }
 
-      const payload = {
+      // Build payload - send null for stopped sensors so backend knows to clear them
+      const payload: any = {
         device_id: 'WEB_CONTROLLER',
         battery_level: 100,
         signal_quality: 100,
-        heart_rate: Math.round(hrValue),
-        spo2: Math.round(spo2Value),
-        emg_level: Math.round(emgPercentage), // Send percentage (0-100)
-        menthone_resistance: Math.round(menthoneValue * 10) / 10,
-      };
+        heart_rate: hrValue !== null ? Math.round(hrValue) : null,
+        spo2: spo2Value !== null ? Math.round(spo2Value) : null,
+        emg_level: emgPercentage !== null ? Math.round(emgPercentage) : null,
+        menthone_resistance: menthoneValue !== null ? Math.round(menthoneValue * 10) / 10 : null,
+      }
 
       console.log('📤 Sending sensor data:', {
-        HR: payload.heart_rate,
-        SpO2: payload.spo2,
-        'EMG': `${payload.emg_level}%`,
-        Menthone: payload.menthone_resistance
+        HR: payload.heart_rate ?? 'stopped',
+        SpO2: payload.spo2 ?? 'stopped',
+        'EMG': payload.emg_level !== undefined ? `${payload.emg_level}%` : 'stopped',
+        Menthone: payload.menthone_resistance ?? 'stopped'
       });
 
       const response = await fetch('http://localhost:8000/api/v1/sensor-data', {
@@ -149,9 +150,14 @@ export const SensorControl: React.FC = () => {
           return { ...prev, currentValue: updatedSpO2, targetValue: newTarget };
         });
 
-        // Send combined data using updated values
+        // Send combined data - only send values for running sensors
         setTimeout(() => {
-          sendSensorData(updatedHR, updatedSpO2, emg.currentValue, menthone.currentValue);
+          sendSensorData(
+            updatedHR,
+            updatedSpO2,
+            emg.isRunning ? emg.currentValue : null,
+            menthone.isRunning ? menthone.currentValue : null
+          );
         }, 100);
       }, 2000);
 
@@ -192,7 +198,12 @@ export const SensorControl: React.FC = () => {
         });
 
         setTimeout(() => {
-          sendSensorData(heartRate.currentValue, spo2.currentValue, updatedEMG, menthone.currentValue);
+          sendSensorData(
+            heartRate.isRunning ? heartRate.currentValue : null,
+            spo2.isRunning ? spo2.currentValue : null,
+            updatedEMG,
+            menthone.isRunning ? menthone.currentValue : null
+          );
         }, 100);
       }, 2000);
 
@@ -215,31 +226,49 @@ export const SensorControl: React.FC = () => {
 
           if (prev.mode === 'normal') {
             // Baseline: 1-4% - MORE JAGGED
-            newValue = fluctuate(2.5, 1); // Random around 2.5 +/- 1
-            newValue = fluctuate(newValue, 0.5); // Add extra jitter
+            // If coming down from elevated mode, slowly decrease
+            if (prev.currentValue > 5) {
+              // Gradually drop with jagged pattern
+              const isDecrease = Math.random() > 0.2; // 80% chance of decrease
+              if (isDecrease) {
+                const drop = 0.5 + Math.random() * 1.5; // -0.5 to -2%
+                newValue = prev.currentValue - drop;
+                console.log('  Cooling down - decreasing by', drop, 'to', newValue);
+              } else {
+                const smallJump = 0.2 + Math.random() * 0.8; // +0.2 to +1% (occasional small rises)
+                newValue = prev.currentValue + smallJump;
+                console.log('  Cooling down - small rise by', smallJump, 'to', newValue);
+              }
+              // Add jitter
+              newValue = fluctuate(newValue, 0.4);
+            } else {
+              // Already at baseline, just fluctuate normally
+              newValue = fluctuate(2.5, 1); // Random around 2.5 +/- 1
+              newValue = fluctuate(newValue, 0.5); // Add extra jitter
+            }
           } else if (prev.mode === 'elevated') {
             console.log('⚠️ Menthone in ELEVATED mode, current:', prev.currentValue);
             // Check if we're near the cap (19.7%)
             if (prev.currentValue >= 19.7) {
               // Hover around 19.7% - go up a bit, down a bit
-              const smallChange = (Math.random() - 0.5) * 0.8; // -0.4 to +0.4%
+              const smallChange = (Math.random() - 0.5) * 1.2; // -0.6 to +0.6% - more jagged
               newValue = prev.currentValue + smallChange;
               console.log('  At cap, hovering. New value:', newValue);
             } else {
-              // Pre-seizure buildup: JAGGED rapid increase toward 19.7%
-              // Add random jump: mostly up (2-4%), sometimes down (1-2%)
-              const isIncrease = Math.random() > 0.25; // 75% chance of increase
+              // Pre-seizure buildup: VERY JAGGED, SLOWER increase toward 19.7%
+              // Random walk with big jumps up and down
+              const isIncrease = Math.random() > 0.35; // 65% chance of increase (was 75%)
               if (isIncrease) {
-                const jump = 2 + Math.random() * 2; // +2 to +4%
+                const jump = 1 + Math.random() * 1; // +1 to +2% (HALF SPEED - was +2 to +4%)
                 newValue = prev.currentValue + jump;
                 console.log('  Increasing by', jump, 'to', newValue);
               } else {
-                const drop = 0.5 + Math.random() * 1.5; // -0.5 to -2%
+                const drop = 0.3 + Math.random() * 1.2; // -0.3 to -1.5% (more jagged drops)
                 newValue = prev.currentValue - drop;
                 console.log('  Decreasing by', drop, 'to', newValue);
               }
-              // Add small jitter
-              newValue = fluctuate(newValue, 0.3);
+              // Add BIGGER jitter for more jaggedness
+              newValue = fluctuate(newValue, 0.6);
             }
           }
 
@@ -249,7 +278,12 @@ export const SensorControl: React.FC = () => {
         });
 
         setTimeout(() => {
-          sendSensorData(heartRate.currentValue, spo2.currentValue, emg.currentValue, updatedMenthone);
+          sendSensorData(
+            heartRate.isRunning ? heartRate.currentValue : null,
+            spo2.isRunning ? spo2.currentValue : null,
+            emg.isRunning ? emg.currentValue : null,
+            updatedMenthone
+          );
         }, 100);
       }, 2000);
 
@@ -285,16 +319,21 @@ export const SensorControl: React.FC = () => {
 
   const setElevatedMode = (sensorType: string) => {
     if (sensorType === 'heartrate') {
-      setHeartRate(prev => ({ ...prev, mode: 'elevated' }));
-      setSpo2(prev => ({ ...prev, mode: 'elevated' }));
-      console.log('🔥 Heart Rate & SpO2 set to ELEVATED mode');
+      setHeartRate(prev => ({ ...prev, mode: 'elevated', isRunning: true }));
+      setSpo2(prev => ({ ...prev, mode: 'elevated', isRunning: true }));
+      console.log('🔥 Heart Rate & SpO2 set to ELEVATED mode (auto-started)');
     } else if (sensorType === 'emg') {
-      setEmg(prev => ({ ...prev, mode: 'elevated' }));
-      console.log('🔥 EMG set to ELEVATED mode');
+      setEmg(prev => ({ ...prev, mode: 'elevated', isRunning: true }));
+      console.log('🔥 EMG set to ELEVATED mode (auto-started)');
     } else if (sensorType === 'menthone') {
       setMenthone(prev => {
-        console.log('🔥 Menthone set to ELEVATED mode - current value:', prev.currentValue, 'isRunning:', prev.isRunning);
-        return { ...prev, mode: 'elevated' };
+        console.log('🔥🔥🔥 MENTHONE BUTTON CLICKED - SETTING TO ELEVATED 🔥🔥🔥');
+        console.log('   Current value:', prev.currentValue);
+        console.log('   Was running:', prev.isRunning);
+        console.log('   Old mode:', prev.mode);
+        const newState = { ...prev, mode: 'elevated' as SimulationMode, isRunning: true };
+        console.log('   New mode:', newState.mode, '- AUTO-STARTED');
+        return newState;
       });
     }
   };

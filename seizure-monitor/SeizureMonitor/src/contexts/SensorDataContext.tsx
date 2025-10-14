@@ -82,26 +82,51 @@ export const SensorDataProvider: React.FC<SensorDataProviderProps> = ({ children
     setLatestData(data);
     setLastUpdate(new Date());
 
-    // Update historical data arrays
+    // Update historical data arrays - clear array if sensor sends null (stopped)
     setHeartRateData((prev) => {
+      if (data.heart_rate === null || data.heart_rate === undefined) {
+        console.log(`  HR stopped - clearing data array`);
+        return [];
+      }
       const newData = addDataPoint(prev, data.heart_rate);
       console.log(`  HR data points: ${newData.length}, latest: ${data.heart_rate}`);
       return newData;
     });
     setSpo2Data((prev) => {
+      if (data.spo2 === null || data.spo2 === undefined) {
+        console.log(`  SpO2 stopped - clearing data array`);
+        return [];
+      }
       const newData = addDataPoint(prev, data.spo2);
       console.log(`  SpO2 data points: ${newData.length}, latest: ${data.spo2}`);
       return newData;
     });
-    setTemperatureData((prev) => addDataPoint(prev, data.temperature));
-    setHumidityData((prev) => addDataPoint(prev, data.humidity));
-    setGasResistanceData((prev) => addDataPoint(prev, data.gas_resistance));
+    setTemperatureData((prev) => {
+      if (data.temperature === null || data.temperature === undefined) return [];
+      return addDataPoint(prev, data.temperature);
+    });
+    setHumidityData((prev) => {
+      if (data.humidity === null || data.humidity === undefined) return [];
+      return addDataPoint(prev, data.humidity);
+    });
+    setGasResistanceData((prev) => {
+      if (data.gas_resistance === null || data.gas_resistance === undefined) return [];
+      return addDataPoint(prev, data.gas_resistance);
+    });
     setMenthoneData((prev) => {
+      if (data.menthone_resistance === null || data.menthone_resistance === undefined) {
+        console.log(`  Menthone stopped - clearing data array`);
+        return [];
+      }
       const newData = addDataPoint(prev, data.menthone_resistance);
       console.log(`  Menthone data points: ${newData.length}, latest: ${data.menthone_resistance}`);
       return newData;
     });
     setEmgData((prev) => {
+      if (data.emg_level === null || data.emg_level === undefined) {
+        console.log(`  EMG stopped - clearing data array`);
+        return [];
+      }
       const newData = addDataPoint(prev, data.emg_level);
       console.log(`  EMG data points: ${newData.length}, latest: ${data.emg_level}`);
       return newData;
