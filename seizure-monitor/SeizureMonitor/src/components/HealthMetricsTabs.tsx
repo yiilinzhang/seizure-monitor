@@ -100,8 +100,8 @@ export const HealthMetricsTabs: React.FC = () => {
     const dataArray = sensorData[activeTabConfig.dataKey] as number[];
     if (!dataArray || dataArray.length === 0) return [];
 
-    // Apply smoothing to reduce noise
-    return smoothData(dataArray, 5);
+    // NO SMOOTHING - show raw jagged data
+    return dataArray;
   }, [sensorData, activeTabConfig.dataKey]);
 
   // Just use actual data - custom chart handles fixed scale

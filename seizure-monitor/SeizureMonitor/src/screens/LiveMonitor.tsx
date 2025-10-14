@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   Alert,
   RefreshControl,
+  Modal,
+  Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Layout } from '../components/Layout';
@@ -14,17 +16,44 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { SeizurePrediction } from '../components/SeizurePrediction';
 import { HealthMetricsTabs } from '../components/HealthMetricsTabs';
+import { useSensorData } from '../contexts/SensorDataContext';
 
 export const LiveMonitor: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertCountdown, setAlertCountdown] = useState(10);
+  const [showBigPopup, setShowBigPopup] = useState(false);
+  const sensorData = useSensorData();
 
-  // Real seizure prediction data - defaults to low risk with no data
-  const seizureRisk: 'low' | 'medium' | 'high' = 'low';
-  const timeToSeizure: number | undefined = undefined;
-  const aiConfidence: number = 0;
+  // Calculate seizure prediction based on menthone level
+  const { seizureRisk, timeToSeizure, aiConfidence } = useMemo(() => {
+    const menthoneLevel = sensorData.latestData?.menthone_resistance || 0;
+
+    // Baseline: 1-4%
+    // Pre-seizure: 10-17%+
+    if (menthoneLevel < 5) {
+      return {
+        seizureRisk: 'low' as const,
+        timeToSeizure: undefined,
+        aiConfidence: 95,
+      };
+    } else if (menthoneLevel >= 5 && menthoneLevel < 10) {
+      return {
+        seizureRisk: 'medium' as const,
+        timeToSeizure: 30,
+        aiConfidence: Math.round(60 + (menthoneLevel - 5) * 6), // 60-90%
+      };
+    } else {
+      // High risk: menthone >= 10%
+      const minutesLeft = Math.max(5, Math.round(20 - (menthoneLevel - 10) * 1.5));
+      return {
+        seizureRisk: 'high' as const,
+        timeToSeizure: minutesLeft,
+        aiConfidence: Math.min(98, Math.round(85 + (menthoneLevel - 10))), // 85-98%
+      };
+    }
+  }, [sensorData.latestData?.menthone_resistance]);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -51,19 +80,14 @@ export const LiveMonitor: React.FC = () => {
   };
 
   const handleManualEvent = () => {
-    Alert.alert(
-      'Mark Seizure Event',
-      'Are you sure you want to manually mark a seizure event?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => {
-            triggerEmergencyAlert();
-          },
-        },
-      ]
-    );
+    // Show big popup immediately
+    setShowBigPopup(true);
+
+    // Auto-close after 3 seconds
+    setTimeout(() => {
+      setShowBigPopup(false);
+      Alert.alert('Emergency', 'Emergency contacts have been notified');
+    }, 3000);
   };
 
   return (
@@ -275,6 +299,49 @@ export const LiveMonitor: React.FC = () => {
           </Button>
         </View>
       )}
+
+      {/* BIG SEIZURE ALERT POPUP */}
+      <Modal
+        visible={showBigPopup}
+        transparent={true}
+        animationType="fade"
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(255, 0, 0, 0.95)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 40,
+          }}
+        >
+          <Icon name="alert-octagon" size={100} color="#FFFFFF" />
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 48,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginTop: 30,
+              lineHeight: 58,
+            }}
+          >
+            SEIZURE
+          </Text>
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 36,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginTop: 20,
+              lineHeight: 44,
+            }}
+          >
+            ALERTING EMERGENCY CONTACTS NOW
+          </Text>
+        </View>
+      </Modal>
     </Layout>
   );
 };

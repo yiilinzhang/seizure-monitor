@@ -28,9 +28,9 @@ export const SensorControl: React.FC = () => {
   });
   const [emg, setEmg] = useState<SensorState>({
     isRunning: false,
-    currentValue: 100,
+    currentValue: 6, // Start at 6% (minimal activity)
     mode: 'stopped',
-    targetValue: 100
+    targetValue: 6
   });
   const [menthone, setMenthone] = useState<SensorState>({
     isRunning: false,
@@ -52,7 +52,7 @@ export const SensorControl: React.FC = () => {
     return current < target ? current + step : current - step;
   };
 
-  const sendSensorData = async (hrValue: number, spo2Value: number, emgValue: number, menthoneValue: number) => {
+  const sendSensorData = async (hrValue: number, spo2Value: number, emgPercentage: number, menthoneValue: number) => {
     try {
       const token = localStorage.getItem('authToken');
 
@@ -68,14 +68,14 @@ export const SensorControl: React.FC = () => {
         signal_quality: 100,
         heart_rate: Math.round(hrValue),
         spo2: Math.round(spo2Value),
-        emg_level: Math.round(emgValue),
+        emg_level: Math.round(emgPercentage), // Send percentage (0-100)
         menthone_resistance: Math.round(menthoneValue * 10) / 10,
       };
 
       console.log('📤 Sending sensor data:', {
         HR: payload.heart_rate,
         SpO2: payload.spo2,
-        EMG: payload.emg_level,
+        'EMG': `${payload.emg_level}%`,
         Menthone: payload.menthone_resistance
       });
 
@@ -115,15 +115,13 @@ export const SensorControl: React.FC = () => {
           let newTarget = prev.targetValue;
 
           if (prev.mode === 'normal') {
-            // Normal resting: 60-80 bpm
-            newTarget = fluctuate(70, 10);
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 0.5);
-            newValue = fluctuate(newValue, 2);
+            // Normal resting: 60-80 bpm - MORE JAGGED
+            newValue = fluctuate(70, 5); // Random around 70 +/- 5
+            newValue = fluctuate(newValue, 3); // Add extra jitter
           } else if (prev.mode === 'elevated') {
-            // Exercise: 120-160 bpm
-            newTarget = fluctuate(140, 20);
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 2);
-            newValue = fluctuate(newValue, 5);
+            // Exercise: 120-160 bpm - MORE JAGGED
+            newValue = fluctuate(140, 15); // Random around 140 +/- 15
+            newValue = fluctuate(newValue, 8); // Add extra jitter
           }
 
           updatedHR = Math.max(50, Math.min(200, newValue));
@@ -137,18 +135,17 @@ export const SensorControl: React.FC = () => {
           let newTarget = prev.targetValue;
 
           if (prev.mode === 'normal') {
-            // Normal: 95-99%
-            newTarget = fluctuate(97, 2);
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 0.2);
-            newValue = fluctuate(newValue, 1);
+            // Normal: 95-99% - MORE JAGGED
+            newValue = fluctuate(97, 2); // Random around 97 +/- 2
+            newValue = fluctuate(newValue, 1.5); // Add extra jitter
           } else if (prev.mode === 'elevated') {
-            // Exercise (slight drop): 92-96%
-            newTarget = fluctuate(94, 2);
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 0.3);
-            newValue = fluctuate(newValue, 1);
+            // Exercise (slight drop): 95-98% - MORE JAGGED, never below 95%
+            newValue = fluctuate(96.5, 1.5); // Random around 96.5 +/- 1.5
+            newValue = fluctuate(newValue, 1); // Add extra jitter
           }
 
-          updatedSpO2 = Math.max(80, Math.min(100, newValue));
+          // Never go below 95%
+          updatedSpO2 = Math.max(95, Math.min(100, newValue));
           return { ...prev, currentValue: updatedSpO2, targetValue: newTarget };
         });
 
@@ -163,10 +160,12 @@ export const SensorControl: React.FC = () => {
     }
   }, [heartRate.isRunning, heartRate.mode, emg.currentValue, menthone.currentValue]);
 
-  // EMG simulation
+  // EMG simulation (as percentage of 4095)
   useEffect(() => {
     if (emg.isRunning) {
       const intervalId = setInterval(() => {
+        let updatedEMG = 0;
+
         setEmg(prev => {
           if (!prev.isRunning) return prev;
 
@@ -174,37 +173,40 @@ export const SensorControl: React.FC = () => {
           let newTarget = prev.targetValue;
 
           if (prev.mode === 'normal') {
-            // Minimal muscle activity: 50-200 μV
-            newTarget = fluctuate(125, 75);
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 5);
-            newValue = fluctuate(newValue, 20);
+            // Minimal muscle activity: 2-12% with natural variation
+            // Create a new random target each time for natural drift
+            newTarget = fluctuate(7, 5);
+            newValue = moveTowardTarget(prev.currentValue, newTarget, 0.8);
+            // Add more random noise for natural jitter
+            newValue = fluctuate(newValue, 2.5);
           } else if (prev.mode === 'elevated') {
-            // High muscle activity: 800-2000 μV
-            newTarget = fluctuate(1400, 600);
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 50);
-            newValue = fluctuate(newValue, 100);
+            // High muscle activity: 25-65% with strong variation
+            newTarget = fluctuate(45, 20);
+            newValue = moveTowardTarget(prev.currentValue, newTarget, 3);
+            // More dramatic fluctuations during elevated activity
+            newValue = fluctuate(newValue, 8);
           }
 
-          return { ...prev, currentValue: Math.max(0, Math.min(3000, newValue)), targetValue: newTarget };
+          updatedEMG = Math.max(0, Math.min(100, newValue));
+          return { ...prev, currentValue: updatedEMG, targetValue: newTarget };
         });
 
-        sendSensorData(
-          heartRate.currentValue,
-          spo2.currentValue,
-          emg.currentValue,
-          menthone.currentValue
-        );
+        setTimeout(() => {
+          sendSensorData(heartRate.currentValue, spo2.currentValue, updatedEMG, menthone.currentValue);
+        }, 100);
       }, 2000);
 
       intervalRefs.current['emg'] = intervalId;
       return () => clearInterval(intervalId);
     }
-  }, [emg.isRunning, emg.mode]);
+  }, [emg.isRunning, emg.mode, heartRate.currentValue, spo2.currentValue, menthone.currentValue]);
 
   // Menthone simulation
   useEffect(() => {
     if (menthone.isRunning) {
       const intervalId = setInterval(() => {
+        let updatedMenthone = 0;
+
         setMenthone(prev => {
           if (!prev.isRunning) return prev;
 
@@ -212,41 +214,61 @@ export const SensorControl: React.FC = () => {
           let newTarget = prev.targetValue;
 
           if (prev.mode === 'normal') {
-            // Baseline: 1-4%
-            newTarget = fluctuate(2.5, 1.5);
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 0.05);
-            newValue = fluctuate(newValue, 0.2);
+            // Baseline: 1-4% - MORE JAGGED
+            newValue = fluctuate(2.5, 1); // Random around 2.5 +/- 1
+            newValue = fluctuate(newValue, 0.5); // Add extra jitter
           } else if (prev.mode === 'elevated') {
-            // Pre-seizure buildup: gradually toward 17%
-            newTarget = 17;
-            newValue = moveTowardTarget(prev.currentValue, newTarget, 0.1);
-            newValue = fluctuate(newValue, 0.5);
+            console.log('⚠️ Menthone in ELEVATED mode, current:', prev.currentValue);
+            // Check if we're near the cap (19.7%)
+            if (prev.currentValue >= 19.7) {
+              // Hover around 19.7% - go up a bit, down a bit
+              const smallChange = (Math.random() - 0.5) * 0.8; // -0.4 to +0.4%
+              newValue = prev.currentValue + smallChange;
+              console.log('  At cap, hovering. New value:', newValue);
+            } else {
+              // Pre-seizure buildup: JAGGED rapid increase toward 19.7%
+              // Add random jump: mostly up (2-4%), sometimes down (1-2%)
+              const isIncrease = Math.random() > 0.25; // 75% chance of increase
+              if (isIncrease) {
+                const jump = 2 + Math.random() * 2; // +2 to +4%
+                newValue = prev.currentValue + jump;
+                console.log('  Increasing by', jump, 'to', newValue);
+              } else {
+                const drop = 0.5 + Math.random() * 1.5; // -0.5 to -2%
+                newValue = prev.currentValue - drop;
+                console.log('  Decreasing by', drop, 'to', newValue);
+              }
+              // Add small jitter
+              newValue = fluctuate(newValue, 0.3);
+            }
           }
 
-          return { ...prev, currentValue: Math.max(0, Math.min(50, newValue)), targetValue: newTarget };
+          // Hard cap at 19.7%
+          updatedMenthone = Math.max(0, Math.min(19.7, newValue));
+          return { ...prev, currentValue: updatedMenthone, targetValue: newTarget };
         });
 
-        sendSensorData(
-          heartRate.currentValue,
-          spo2.currentValue,
-          emg.currentValue,
-          menthone.currentValue
-        );
+        setTimeout(() => {
+          sendSensorData(heartRate.currentValue, spo2.currentValue, emg.currentValue, updatedMenthone);
+        }, 100);
       }, 2000);
 
       intervalRefs.current['menthone'] = intervalId;
       return () => clearInterval(intervalId);
     }
-  }, [menthone.isRunning, menthone.mode]);
+  }, [menthone.isRunning, menthone.mode, heartRate.currentValue, spo2.currentValue, emg.currentValue]);
 
   const startReading = (sensorType: string) => {
     if (sensorType === 'heartrate') {
       setHeartRate(prev => ({ ...prev, isRunning: true, mode: 'normal' }));
       setSpo2(prev => ({ ...prev, isRunning: true, mode: 'normal' }));
+      console.log('▶️ Heart Rate & SpO2 STARTED');
     } else if (sensorType === 'emg') {
       setEmg(prev => ({ ...prev, isRunning: true, mode: 'normal' }));
+      console.log('▶️ EMG STARTED');
     } else if (sensorType === 'menthone') {
       setMenthone(prev => ({ ...prev, isRunning: true, mode: 'normal' }));
+      console.log('▶️ Menthone STARTED');
     }
   };
 
@@ -265,10 +287,15 @@ export const SensorControl: React.FC = () => {
     if (sensorType === 'heartrate') {
       setHeartRate(prev => ({ ...prev, mode: 'elevated' }));
       setSpo2(prev => ({ ...prev, mode: 'elevated' }));
+      console.log('🔥 Heart Rate & SpO2 set to ELEVATED mode');
     } else if (sensorType === 'emg') {
       setEmg(prev => ({ ...prev, mode: 'elevated' }));
+      console.log('🔥 EMG set to ELEVATED mode');
     } else if (sensorType === 'menthone') {
-      setMenthone(prev => ({ ...prev, mode: 'elevated' }));
+      setMenthone(prev => {
+        console.log('🔥 Menthone set to ELEVATED mode - current value:', prev.currentValue, 'isRunning:', prev.isRunning);
+        return { ...prev, mode: 'elevated' };
+      });
     }
   };
 
@@ -329,7 +356,7 @@ export const SensorControl: React.FC = () => {
           <div className="flex items-center justify-center gap-4">
             <div>
               <div className={`text-6xl font-bold mb-2`} style={{ color }}>
-                {value.toFixed(sensorType === 'menthone' ? 1 : 0)}
+                {value.toFixed(sensorType === 'menthone' || sensorType === 'emg' ? 1 : 0)}
               </div>
               <div className="text-bodySmall text-ink-60">{unit}</div>
             </div>
@@ -412,7 +439,7 @@ export const SensorControl: React.FC = () => {
         <SensorControlCard
           title="EMG Level"
           value={emg.currentValue}
-          unit="μV"
+          unit="%"
           state={emg}
           sensorType="emg"
           color="#FFB366"
