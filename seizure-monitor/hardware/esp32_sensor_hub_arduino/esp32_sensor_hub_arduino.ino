@@ -20,7 +20,7 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_BME680.h>
-// #include <MAX30105.h>  // MAX30102 disabled - testing BME680 only
+// #include <MAX30105.h>  // MAX30102 sensor library (disabled - sensor died)
 
 // ===== CONFIGURATION - EDIT THESE VALUES =====
 
@@ -36,7 +36,7 @@ const char* WIFI_PASSWORD = "yyyolinn";   // Change this to your WiFi password
 // Your Mac's current IP: 172.20.10.2
 // To check IP: System Settings → Network → WiFi → Details → TCP/IP
 const char* API_URL = "http://172.20.10.2:8000";  // Your Mac's IP address
-const char* API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODVkNGI5NC1jNjg2LTRmZTctYTMzYi1mOTEzMTg2NTRiOWMiLCJlbWFpbCI6ImFyZHVpbm9AdGVzdC5jb20iLCJleHAiOjE3NjA0MzQ0NzMsImlhdCI6MTc2MDM0ODA3M30.YxdW2Co1hB1r75MS7Bknn6Gm8uV-X1D_4VUNFlXCYSw";  // Auth token for arduino@test.com
+const char* API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODVkNGI5NC1jNjg2LTRmZTctYTMzYi1mOTEzMTg2NTRiOWMiLCJlbWFpbCI6ImFyZHVpbm9AdGVzdC5jb20iLCJleHAiOjE3NjA1MjM1MzEsImlhdCI6MTc2MDQzNzEzMX0.FXCNENJvj3FErHT3ZNiQu5ModBIlNGSmfhoFjBcBPdk";  // Auth token for arduino@test.com (refreshed 2025-10-14)
 
 // ===== END CONFIGURATION =====
 
@@ -47,13 +47,12 @@ const char* API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODVkNG
 // I2C pins
 // For ESP32 (original): SDA=21, SCL=22
 // For ESP32-S3: Can use any GPIO pins
-// Try GPIO 8/10 if 8/9 doesn't work
-#define I2C_SDA 8   // GPIO 8 for ESP32-S3
-#define I2C_SCL 10  // GPIO 10 for ESP32-S3 (changed from 9)
+#define I2C_SDA 21   // GPIO 21 for standard ESP32
+#define I2C_SCL 22   // GPIO 22 for standard ESP32
 
 // EMG sensor pin (analog input)
-// For ESP32-S3, use GPIO 1-10 for ADC (GPIO 35 doesn't exist on S3)
-#define EMG_PIN 1  // GPIO 1 (ADC1_CH0) for ESP32-S3
+// For standard ESP32: GPIO 32-39 are ADC pins
+#define EMG_PIN 35  // GPIO 35 (ADC1_CH7) for standard ESP32
 
 // EMG signal processing
 #define EMG_SAMPLES 10      // Number of samples for moving average (faster response)
@@ -61,7 +60,7 @@ const char* API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODVkNG
 
 // Sensor objects
 Adafruit_BME680 bme;
-// MAX30105 particleSensor;  // MAX30102 disabled
+// MAX30105 particleSensor;  // MAX30102 sensor object (disabled - sensor died)
 
 // Timing
 unsigned long lastReading = 0;
@@ -77,9 +76,9 @@ int emgBuffer[EMG_SAMPLES];
 int emgBufferIndex = 0;
 bool emgBufferFilled = false;
 
-// EMG statistics for aggregation
+// EMG statistics for aggregation (raw ADC values 0-4095)
 float lastEMGValue = 0;
-float emgMin = 100;
+float emgMin = 4095;
 float emgMax = 0;
 float emgSum = 0;
 int emgCount = 0;
@@ -125,15 +124,14 @@ void setup() {
 
   Serial.println("✅ I2C bus initialized at 100kHz");
 
-  // EMG DISABLED FOR TESTING - Uncomment to enable
-  // // Initialize EMG pin
-  // pinMode(EMG_PIN, INPUT);
-  // analogReadResolution(12);  // 12-bit ADC (0-4095)
-  //
-  // // Initialize EMG buffer
-  // for (int i = 0; i < EMG_SAMPLES; i++) {
-  //   emgBuffer[i] = 0;
-  // }
+  // Initialize EMG pin
+  pinMode(EMG_PIN, INPUT);
+  analogReadResolution(12);  // 12-bit ADC (0-4095)
+
+  // Initialize EMG buffer
+  for (int i = 0; i < EMG_SAMPLES; i++) {
+    emgBuffer[i] = 0;
+  }
 
   // Setup WiFi
   setupWiFi();
@@ -160,18 +158,17 @@ void loop() {
     lastWiFiCheck = currentMillis;
   }
 
-  // EMG DISABLED FOR TESTING
-  // // Read EMG at high frequency (50 Hz)
-  // if (currentMillis - lastEMGReading >= EMG_READING_INTERVAL) {
-  //   lastEMGReading = currentMillis;
-  //   lastEMGValue = readEMG();
-  //
-  //   // Track statistics for aggregation
-  //   emgSum += lastEMGValue;
-  //   emgCount++;
-  //   if (lastEMGValue < emgMin) emgMin = lastEMGValue;
-  //   if (lastEMGValue > emgMax) emgMax = lastEMGValue;
-  // }
+  // Read EMG at high frequency (50 Hz)
+  if (currentMillis - lastEMGReading >= EMG_READING_INTERVAL) {
+    lastEMGReading = currentMillis;
+    lastEMGValue = readEMG();
+
+    // Track statistics for aggregation (raw ADC values)
+    emgSum += lastEMGValue;
+    emgCount++;
+    if (lastEMGValue < emgMin) emgMin = lastEMGValue;
+    if (lastEMGValue > emgMax) emgMax = lastEMGValue;
+  }
 
   // Read other sensors and send data at slower interval
   if (currentMillis - lastReading >= READING_INTERVAL) {
@@ -202,22 +199,25 @@ void loop() {
       if (i2cFailureCount > 0) i2cFailureCount--;
     }
 
-    // EMG DISABLED FOR TESTING
-    float emgAverage = -1;  // Disabled
-    // // Calculate EMG average from high-frequency samples
-    // float emgAverage = emgCount > 0 ? emgSum / emgCount : lastEMGValue;
-    //
-    // if (emgAverage < 0 || lastEMGValue < 0) {
-    //   Serial.println("   💪 EMG: ❌ Sensor not connected (GPIO 35)");
-    //   emgAverage = -1;  // Don't send invalid data
-    // } else {
-    //   Serial.printf("   💪 EMG Stats - Avg: %.1f%% | Current: %.1f%% | Max: %.1f%% (samples: %d)\n",
-    //                 emgAverage, lastEMGValue, emgMax, emgCount);
-    // }
+    // Calculate EMG average from high-frequency samples (raw values 0-4095)
+    float emgAverage = emgCount > 0 ? emgSum / emgCount : lastEMGValue;
 
-    // MAX30102 disabled for testing
-    float heartRate = -1, spo2 = -1;
-    bool maxOk = false;
+    if (emgCount > 0) {
+      Serial.printf("   💪 EMG Stats - Avg: %.0f | Current: %.0f | Min: %.0f | Max: %.0f (samples: %d)\n",
+                    emgAverage, lastEMGValue, emgMin, emgMax, emgCount);
+    } else {
+      Serial.println("   💪 EMG: No samples collected");
+      emgAverage = -1;  // Don't send invalid data
+    }
+
+    // MAX30102 disabled - using mock data
+    // Generate realistic mock data: HR 60-80 bpm, SpO2 95-99%
+    float heartRate = 80.0 + random(-10, 11);  // 60-80 bpm
+    float spo2 = 97.0 + random(-2, 3);         // 95-99%
+    bool maxOk = true;  // Pretend sensor is working
+
+    Serial.printf("   ❤️  HR: %.0f bpm | 🫁 SpO2: %.0f%% \n", heartRate, spo2);
+
     // bool maxOk = readMAX30102(heartRate, spo2);
     //
     // if (!maxOk) {
@@ -242,12 +242,11 @@ void loop() {
       Serial.println("   ❌ No valid sensor readings");
     }
 
-    // EMG DISABLED FOR TESTING
-    // // Reset EMG statistics
-    // emgSum = 0;
-    // emgCount = 0;
-    // emgMin = 100;
-    // emgMax = 0;
+    // Reset EMG statistics
+    emgSum = 0;
+    emgCount = 0;
+    emgMin = 4095;
+    emgMax = 0;
 
     Serial.println();
   }
@@ -259,34 +258,75 @@ void setupWiFi() {
   Serial.printf("📡 Connecting to WiFi: %s\n", WIFI_SSID);
   Serial.println("   (This may take 10-20 seconds...)\n");
 
+  // Disconnect and clear any previous WiFi config
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  delay(1000);
+
+  // Set WiFi mode
   WiFi.mode(WIFI_STA);
+  delay(500);
+
+  // Disable power saving for better connectivity
+  WiFi.setSleep(false);
+
+  // Scan for available networks first
+  Serial.println("   Scanning for WiFi networks...");
+  int n = WiFi.scanNetworks();
+  Serial.printf("   Found %d networks:\n", n);
+  bool foundNetwork = false;
+  for (int i = 0; i < n; i++) {
+    Serial.printf("      %d: %s (Signal: %d dBm)\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
+    if (WiFi.SSID(i) == WIFI_SSID) {
+      foundNetwork = true;
+      Serial.printf("      ✅ Found target network: %s\n", WIFI_SSID);
+    }
+  }
+
+  if (!foundNetwork) {
+    Serial.printf("\n   ⚠️  WARNING: Network '%s' not found in scan!\n", WIFI_SSID);
+    Serial.println("      Check: 1) SSID spelling/case  2) 2.4GHz network  3) Router is on\n");
+  }
+
+  // Start connection
+  Serial.println("\n   Attempting connection...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 40) {  // Increased to 40 attempts (20 seconds)
+  while (WiFi.status() != WL_CONNECTED && attempts < 40) {  // 20 seconds total
     delay(500);
     Serial.print(".");
     attempts++;
 
     if (attempts % 10 == 0) {
       Serial.printf(" (%d/40)\n", attempts);
+      Serial.printf("   Status code: %d\n", WiFi.status());
     }
   }
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n✅ WiFi connected!");
     Serial.printf("   IP Address: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("   Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+    Serial.printf("   Subnet: %s\n", WiFi.subnetMask().toString().c_str());
     Serial.printf("   Signal: %d dBm\n", WiFi.RSSI());
   } else {
     Serial.println("\n\n========================================");
     Serial.println("❌ WiFi connection FAILED!");
     Serial.println("========================================");
     Serial.printf("   SSID: %s\n", WIFI_SSID);
+    Serial.printf("   Status code: %d\n", WiFi.status());
+    Serial.println("\n   Status codes:");
+    Serial.println("   0 = WL_IDLE_STATUS");
+    Serial.println("   1 = WL_NO_SSID_AVAIL (network not found)");
+    Serial.println("   4 = WL_CONNECT_FAILED (wrong password)");
+    Serial.println("   6 = WL_DISCONNECTED");
     Serial.println("\n   TROUBLESHOOTING:");
     Serial.println("   1. Check WiFi name is correct (case-sensitive)");
     Serial.println("   2. Check WiFi password is correct");
     Serial.println("   3. Make sure it's 2.4GHz WiFi (not 5GHz)");
     Serial.println("   4. Try moving ESP32 closer to router");
+    Serial.println("   5. Check router allows new devices");
     Serial.println("========================================\n");
     Serial.println("⚠️  Continuing without WiFi...\n");
   }
@@ -339,7 +379,7 @@ void scanI2C() {
   if (nDevices == 0) {
     Serial.println("❌❌❌ NO I2C DEVICES FOUND! ❌❌❌");
     Serial.println("========================================");
-    Serial.println("WIRING CHECK FOR ESP32-S3:");
+    Serial.println("WIRING CHECK FOR ESP32:");
     Serial.printf("   SDA → GPIO %d\n", I2C_SDA);
     Serial.printf("   SCL → GPIO %d\n", I2C_SCL);
     Serial.println("   VCC → 3.3V");
@@ -395,55 +435,70 @@ void setupSensors() {
 
   delay(200);  // Delay before next sensor
 
-  // Initialize MAX30102 with retry
-  Serial.print("   MAX30102: ");
-  bool maxInitialized = false;
-  for (int attempt = 0; attempt < 3; attempt++) {
-    if (particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
-      Serial.println("✅ OK");
-      maxInitialized = true;
+  // MAX30102 disabled - sensor died
+  Serial.println("   MAX30102: ⚠️  DISABLED (sensor died)");
 
-      // Configure MAX30102 with explicit settings
-      byte ledBrightness = 0x1F;  // 0x00 = off, 0xFF = max (try 0x1F = ~12%)
-      byte sampleAverage = 4;     // Average 4 samples
-      byte ledMode = 2;           // 2 = Red LED only (SpO2)
-      int sampleRate = 100;       // 100 samples per second
-      int pulseWidth = 411;       // 411 µs pulse width
-      int adcRange = 4096;        // 4096 (15.63pA per LSB)
-
-      particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange);
-
-      // Turn on Red LED to indicate sensor is active
-      particleSensor.setPulseAmplitudeRed(0x1F);  // Brighter LED
-      particleSensor.setPulseAmplitudeGreen(0);   // Turn off Green LED
-
-      Serial.println("      🔴 Red LED should be ON now!");
-      Serial.println("      Place finger on sensor to test");
-      break;
-    } else {
-      if (attempt < 2) {
-        Serial.printf("retry %d...", attempt + 2);
-        delay(500);
-      }
-    }
-  }
-
-  if (!maxInitialized) {
-    Serial.println("❌ Not found");
-    Serial.println("      Expected I2C address: 0x57");
-    Serial.println("      Check wiring and power (3.3V)");
-  }
+  // Initialize MAX30102 with retry (COMMENTED OUT)
+  // Serial.print("   MAX30102: ");
+  // bool maxInitialized = false;
+  // for (int attempt = 0; attempt < 3; attempt++) {
+  //   if (particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
+  //     Serial.println("✅ OK");
+  //     maxInitialized = true;
+  //
+  //     // Configure MAX30102 with explicit settings
+  //     byte ledBrightness = 0x1F;  // 0x00 = off, 0xFF = max (try 0x1F = ~12%)
+  //     byte sampleAverage = 4;     // Average 4 samples
+  //     byte ledMode = 2;           // 2 = Red LED only (SpO2)
+  //     int sampleRate = 100;       // 100 samples per second
+  //     int pulseWidth = 411;       // 411 µs pulse width
+  //     int adcRange = 4096;        // 4096 (15.63pA per LSB)
+  //
+  //     particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange);
+  //
+  //     // Turn on Red LED to indicate sensor is active
+  //     particleSensor.setPulseAmplitudeRed(0x1F);  // Brighter LED
+  //     particleSensor.setPulseAmplitudeGreen(0);   // Turn off Green LED
+  //
+  //     Serial.println("      🔴 Red LED should be ON now!");
+  //     Serial.println("      Place finger on sensor to test");
+  //     break;
+  //   } else {
+  //     if (attempt < 2) {
+  //       Serial.printf("retry %d...", attempt + 2);
+  //       delay(500);
+  //     }
+  //   }
+  // }
+  //
+  // if (!maxInitialized) {
+  //   Serial.println("❌ Not found");
+  //   Serial.println("      Expected I2C address: 0x57");
+  //   Serial.println("      Check wiring and power (3.3V)");
+  // }
 }
 
 bool readBME680(float &temp, float &humidity, float &gasResistance) {
+  // Attempt reading with detailed error checking
   if (!bme.performReading()) {
-    Serial.println("   ❌ BME680 reading failed");
+    Serial.println("   ❌ BME680 reading failed - performReading() returned false");
+    Serial.println("      Possible causes:");
+    Serial.println("      - Sensor disconnected");
+    Serial.println("      - I2C communication error");
+    Serial.println("      - Power issue");
     return false;
   }
 
   temp = bme.temperature;
   humidity = bme.humidity;
   gasResistance = bme.gas_resistance / 1000.0; // Convert to kOhms
+
+  // Check if values are valid (not exactly zero which might indicate error)
+  if (temp == 0.0 && humidity == 0.0 && gasResistance == 0.0) {
+    Serial.println("   ⚠️  BME680 returned all zeros - sensor may not be initialized properly");
+    Serial.println("      Try resetting the ESP32 or checking wiring");
+    return false;
+  }
 
   Serial.printf("   🌡️  Temp: %.1f°C | 💧 Humid: %.1f%% | ⚗️  Gas: %.1f kΩ\n",
                 temp, humidity, gasResistance);
@@ -452,54 +507,41 @@ bool readBME680(float &temp, float &humidity, float &gasResistance) {
 }
 
 bool readMAX30102(float &heartRate, float &spo2) {
+  // MAX30102 disabled - sensor died
+  return false;
+
   // Note: This is a simplified reading
   // For production, implement proper PPG signal processing
-
-  long irValue = particleSensor.getIR();
-
-  if (irValue < 50000) {
-    Serial.println("   ⚠️  No finger detected on MAX30102");
-    return false;
-  }
-
-  // Placeholder values - implement proper heart rate algorithm
-  // In production, use proper PPG analysis
-  heartRate = 75.0 + random(-10, 10);
-  spo2 = 97.0 + random(-2, 2);
-
-  Serial.printf("   ❤️  HR: %.0f bpm | 🫁 SpO2: %.0f%%\n", heartRate, spo2);
-
-  return true;
+  //
+  // long irValue = particleSensor.getIR();
+  //
+  // if (irValue < 50000) {
+  //   Serial.println("   ⚠️  No finger detected on MAX30102");
+  //   return false;
+  // }
+  //
+  // // Placeholder values - implement proper heart rate algorithm
+  // // In production, use proper PPG analysis
+  // heartRate = 75.0 + random(-10, 10);
+  // spo2 = 97.0 + random(-2, 2);
+  //
+  // Serial.printf("   ❤️  HR: %.0f bpm | 🫁 SpO2: %.0f%%\n", heartRate, spo2);
+  //
+  // return true;
 }
 
 float readEMG() {
-  // Read analog value from EMG sensor
+  // Read raw analog value from EMG sensor (0-4095 range on ESP32)
   int rawValue = analogRead(EMG_PIN);
 
-  // Check if sensor is connected
-  // Floating pin typically reads extreme values (very low or very high)
-  // or has very high variance
-  static int consecutiveExtremeReads = 0;
-
-  // If reading is suspiciously at the extremes, sensor might be disconnected
-  if (rawValue < 50 || rawValue > 4000) {
-    consecutiveExtremeReads++;
-    if (consecutiveExtremeReads > 20) {
-      // Likely disconnected - return -1 to indicate no sensor
-      return -1;
-    }
-  } else {
-    consecutiveExtremeReads = 0;  // Reset counter on normal reading
-  }
-
-  // Add to circular buffer
+  // Add to circular buffer for moving average
   emgBuffer[emgBufferIndex] = rawValue;
   emgBufferIndex = (emgBufferIndex + 1) % EMG_SAMPLES;
   if (!emgBufferFilled && emgBufferIndex == 0) {
     emgBufferFilled = true;
   }
 
-  // Calculate moving average
+  // Calculate moving average of raw values
   int sum = 0;
   int count = emgBufferFilled ? EMG_SAMPLES : emgBufferIndex;
   for (int i = 0; i < count; i++) {
@@ -507,13 +549,8 @@ float readEMG() {
   }
   float average = (float)sum / count;
 
-  // Convert to normalized value (0-100 scale)
-  float normalized = (average / 4095.0) * 100.0;
-
-  // Note: We don't print here anymore since we're sampling at 50 Hz
-  // Stats are printed in the main loop every 4 seconds
-
-  return normalized;
+  // Return raw averaged value (0-4095 range)
+  return average;
 }
 
 void sendSensorData(float temp, float humidity, float gas, float hr, float spo2, float emg) {

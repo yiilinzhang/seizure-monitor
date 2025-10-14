@@ -1,0 +1,46 @@
+{
+  "features": [
+    "hr",
+    "hrv",
+    "emg_rms",
+    "emg_var",
+    "mov_mag",
+    "mov_std",
+    "hr_emg_ratio",
+    "hr_mov_ratio",
+    "movement_irregularity",
+    "emg_irregularity",
+    "hrv_mov_ratio",
+    "emg_mov_coupling",
+    "hr_squared",
+    "hrv_normalized",
+    "emg_mov_sync"
+  ],
+  "original_features": [
+    "hr",
+    "hrv",
+    "emg_rms",
+    "emg_var",
+    "mov_mag",
+    "mov_std"
+  ],
+  "engineered_features": [
+    "hr_emg_ratio",
+    "hr_mov_ratio",
+    "movement_irregularity",
+    "emg_irregularity",
+    "hrv_mov_ratio",
+    "emg_mov_coupling",
+    "hr_squared",
+    "hrv_normalized",
+    "emg_mov_sync"
+  ],
+  "optimal_threshold": 0.45,
+  "performance": {
+    "recall": 1.0,
+    "precision": 0.6648237733241189,
+    "f1": 0.7986716479867165,
+    "roc_auc": 0.873960498960499,
+    "false_alarm_rate": 0.2520790020790021
+  }
+}

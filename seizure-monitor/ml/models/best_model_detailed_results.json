@@ -1,0 +1,129 @@
+{
+  "model_type": "RandomForestClassifier",
+  "model_params": {
+    "n_estimators": 400,
+    "max_depth": 20,
+    "min_samples_split": 10,
+    "min_samples_leaf": 4,
+    "max_features": "sqrt",
+    "class_weight": "balanced_subsample"
+  },
+  "features": [
+    "hr",
+    "hrv",
+    "eeg_delta",
+    "eeg_theta",
+    "eeg_alpha",
+    "eeg_beta",
+    "emg_rms",
+    "emg_var",
+    "mov_mag",
+    "mov_std"
+  ],
+  "train_metrics": {
+    "cm": [
+      [
+        13914,
+        1478
+      ],
+      [
+        82,
+        7614
+      ]
+    ],
+    "tn": 13914.0,
+    "fp": 1478.0,
+    "fn": 82.0,
+    "tp": 7614.0,
+    "accuracy": 0.9324324324324325,
+    "precision": 0.8374395072591289,
+    "recall": 0.9893451143451143,
+    "specificity": 0.9039760914760915,
+    "f1": 0.9070764832022873,
+    "npv": 0.9941411831951986,
+    "fpr": 0.09602390852390852,
+    "fnr": 0.010654885654885655,
+    "auc_roc": 0.9899450206468462,
+    "auc_pr": 0.980020558894267,
+    "balanced_acc": 0.9466606029106028
+  },
+  "test_metrics": {
+    "cm": [
+      [
+        3294,
+        554
+      ],
+      [
+        125,
+        1799
+      ]
+    ],
+    "tn": 3294.0,
+    "fp": 554.0,
+    "fn": 125.0,
+    "tp": 1799.0,
+    "accuracy": 0.8823631323631324,
+    "precision": 0.7645558861028474,
+    "recall": 0.935031185031185,
+    "specificity": 0.856029106029106,
+    "f1": 0.8412438625204584,
+    "npv": 0.9634396022228722,
+    "fpr": 0.14397089397089397,
+    "fnr": 0.06496881496881497,
+    "auc_roc": 0.9563158332648978,
+    "auc_pr": 0.8937261839372465,
+    "balanced_acc": 0.8955301455301454
+  },
+  "cv_f1_scores": [
+    0.8406398104265402,
+    0.8437223042836042,
+    0.8307600950118765,
+    0.8312684365781711,
+    0.8357685563997662
+  ],
+  "cv_f1_mean": 0.8364318405399918,
+  "cv_f1_std": 0.005101514595144101,
+  "feature_importance": [
+    {
+      "feature": "eeg_beta",
+      "importance": 0.2966467821758612
+    },
+    {
+      "feature": "eeg_delta",
+      "importance": 0.2692605755347968
+    },
+    {
+      "feature": "eeg_theta",
+      "importance": 0.2241562880904649
+    },
+    {
+      "feature": "eeg_alpha",
+      "importance": 0.169722082171973
+    },
+    {
+      "feature": "emg_rms",
+      "importance": 0.011372312418266133
+    },
+    {
+      "feature": "mov_mag",
+      "importance": 0.00933200804326548
+    },
+    {
+      "feature": "emg_var",
+      "importance": 0.008053912505669494
+    },
+    {
+      "feature": "hr",
+      "importance": 0.007242251323293027
+    },
+    {
+      "feature": "mov_std",
+      "importance": 0.0034819548687641893
+    },
+    {
+      "feature": "hrv",
+      "importance": 0.0007318328676456758
+    }
+  ],
+  "evaluation_time": "2025-10-13T23:43:07.248465"
+}

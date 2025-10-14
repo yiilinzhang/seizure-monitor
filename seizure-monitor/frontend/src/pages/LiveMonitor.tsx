@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MoreVerticalIcon, ActivityIcon, ThermometerIcon, DropletIcon } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { Chip } from '../components/Chip';
@@ -9,19 +9,19 @@ import { Toggle } from '../components/Toggle';
 import { NumberField } from '../components/NumberField';
 import { Button } from '../components/Button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-// Mock data for the chart
-const generateMockData = () => {
-  const data = [];
-  for (let i = 0; i < 60; i++) {
-    const baseValue = 100 + Math.sin(i / 10) * 15;
-    const noise = Math.random() * 5;
-    data.push({
-      time: i,
-      value: baseValue + noise
-    });
-  }
-  return data;
-};
+
+interface SensorData {
+  id: string;
+  timestamp: string;
+  temperature?: number;
+  humidity?: number;
+  gas_resistance?: number;
+  menthone_resistance?: number;
+  heart_rate?: number;
+  spo2?: number;
+  emg_signal?: number;
+}
+
 export const LiveMonitor: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [smoothing, setSmoothing] = useState(0.5);
@@ -30,9 +30,60 @@ export const LiveMonitor: React.FC = () => {
   const [duration, setDuration] = useState(5);
   const [showAlert, setShowAlert] = useState(false);
   const [alertCountdown, setAlertCountdown] = useState(10);
-  const chartData = generateMockData();
-  const deltaPercent = '+18%';
-  const isAlert = true;
+  const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [latestData, setLatestData] = useState<SensorData | null>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [baseline, setBaseline] = useState<number | null>(null);
+
+  // Fetch sensor data from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch('http://localhost:8000/api/v1/sensor-data/history?hours=1&limit=60', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const readings = data.readings || [];
+          setSensorData(readings);
+
+          if (readings.length > 0) {
+            setLatestData(readings[0]);
+
+            // Set baseline if not set
+            if (baseline === null && readings[0].gas_resistance) {
+              setBaseline(readings[0].gas_resistance);
+            }
+
+            // Transform data for chart
+            const transformed = readings.reverse().map((item: SensorData, index: number) => ({
+              time: index,
+              value: item.gas_resistance || item.menthone_resistance || 0
+            }));
+            setChartData(transformed);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching sensor data:', error);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 2000); // Fetch every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [baseline]);
+
+  const deltaPercent = latestData && baseline
+    ? `${((latestData.gas_resistance! - baseline) / baseline * 100).toFixed(1)}%`
+    : '0%';
+  const isAlert = latestData && baseline
+    ? Math.abs((latestData.gas_resistance! - baseline) / baseline * 100) > threshold
+    : false;
   // Simulate alert
   const triggerAlert = () => {
     setShowAlert(true);
@@ -74,13 +125,19 @@ export const LiveMonitor: React.FC = () => {
         <div className="flex justify-between mt-2">
           <div className="flex items-center">
             <ActivityIcon size={16} className="text-ink-60 mr-1" />
-            <span className="text-mono text-ink-60">Baseline: 120 kΩ</span>
+            <span className="text-mono text-ink-60">
+              Baseline: {baseline ? `${baseline.toFixed(1)} kΩ` : 'N/A'}
+            </span>
           </div>
           <div className="flex items-center">
             <ThermometerIcon size={16} className="text-ink-60 mr-1" />
-            <span className="text-mono text-ink-60">24°C</span>
+            <span className="text-mono text-ink-60">
+              {latestData?.temperature ? `${latestData.temperature.toFixed(1)}°C` : 'N/A'}
+            </span>
             <DropletIcon size={16} className="text-ink-60 ml-2 mr-1" />
-            <span className="text-mono text-ink-60">45%</span>
+            <span className="text-mono text-ink-60">
+              {latestData?.humidity ? `${latestData.humidity.toFixed(0)}%` : 'N/A'}
+            </span>
           </div>
         </div>
       </div>

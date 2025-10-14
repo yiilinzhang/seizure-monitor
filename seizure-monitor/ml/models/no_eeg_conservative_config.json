@@ -1,0 +1,19 @@
+{
+  "ratio": "2:1 (current)",
+  "threshold": 0.5,
+  "features": [
+    "hr",
+    "hrv",
+    "emg_rms",
+    "emg_var",
+    "mov_mag",
+    "mov_std"
+  ],
+  "performance": {
+    "recall": 1.0,
+    "precision": 0.6648237733241189,
+    "f1": 0.7986716479867165,
+    "false_alarm_rate": 0.2520790020790021,
+    "missed_seizure_rate": 0.0
+  }
+}
